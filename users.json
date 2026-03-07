@@ -1,0 +1,25 @@
+[
+  {
+    "id": 1,
+    "username": "разроботчик",
+    "password": "2281488",
+    "online": true
+  },
+  {
+    "id": 2,
+    "username": "hasan",
+    "password": "1231412424124",
+    "online": true
+  },
+  {
+    "id": 3,
+    "username": "h",
+    "password": "1488",
+    "online": true
+  },
+  {
+    "id": 4,
+    "username": "рр",
+    "password": "12344321"
+  }
+]

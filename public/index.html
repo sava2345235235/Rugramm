@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rugramm</title>
+<style>
+body.lock-scroll { overflow:hidden; margin:0; padding:0; font-family:'Segoe UI',sans-serif; background:#f5f6fa; }
+#loginScreen { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; width:100%; background:#f0f2f5; }
+#loginScreen h2{margin-bottom:20px;color:#2d3436;} 
+#loginScreen input{width:80%; max-width:300px; padding:12px; margin:8px 0; border-radius:10px; border:1px solid #ccc; font-size:16px;}
+#loginScreen button{width:80%; max-width:300px; padding:12px; margin:8px 0; border:none; border-radius:10px; background:#2d89ff; color:white; font-size:16px; cursor:pointer; transition:0.2s;}
+#loginScreen button:hover{background:#1c6ed0;}
+#error{color:red;margin-top:10px;font-size:14px;}
+
+#chatScreen{display:none; height:100vh; width:100%; flex-direction:row;}
+#chatList{width:30%; background:white; overflow-y:auto; border-right:1px solid #ddd;}
+#chatList h3{padding:12px; margin:0; background:#f7f9fc; display:flex; justify-content:center; align-items:center;}
+#addUserBtn{background:#28a745; margin-left:10px; border:none; padding:4px 8px; border-radius:6px; cursor:pointer; font-size:16px;}
+.chatItem{padding:12px; cursor:pointer; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;}
+.chatItem:hover{background:#f0f0f0;}
+
+#chatWindow{flex:1; display:flex; flex-direction:column; background:#fafafa; position:relative;}
+#messages{flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column;}
+.message{padding:10px 14px; margin:6px 0; border-radius:20px; max-width:70%; word-wrap:break-word; font-size:15px;}
+.message.self{background:#2d89ff; color:white; margin-left:auto;}
+.message.other{background:#e0e0e0; margin-right:auto; color:#2d3436;}
+
+#inputArea{display:flex; padding:10px; border-top:1px solid #ddd; background:white;}
+#inputArea input{flex:1; padding:10px 14px; border-radius:20px; border:1px solid #ccc; font-size:15px; outline:none;}
+#inputArea button{border-radius:20px; background:#2d89ff; color:white; padding:10px 15px; margin-left:8px; border:none; cursor:pointer; font-size:15px;}
+#inputArea button:hover{background:#1c6ed0;}
+</style>
+</head>
+<body class="lock-scroll">
+
+<div id="loginScreen">
+<h2>Регистрация / Вход</h2>
+<input id="usernameInput" placeholder="Имя пользователя">
+<input id="passwordInput" type="password" placeholder="Пароль">
+<div>
+<button id="registerBtn">Регистрация</button>
+<button id="loginBtn">Вход</button>
+</div>
+<p id="error"></p>
+</div>
+
+<div id="chatScreen">
+<div id="chatList">
+<h3>Чаты <button id="addUserBtn">+</button></h3>
+<div id="chatsContainer"></div>
+</div>
+<div id="chatWindow">
+<div id="messages"></div>
+<div id="inputArea">
+<input id="messageInput" placeholder="Введите сообщение">
+<button id="sendBtn">Отправить</button>
+</div>
+</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", ()=>{
+const socket = io();
+let currentUser=null;
+let currentChatId=null;
+let usersList=[];
+
+async function register(){
+  const username=document.getElementById("usernameInput").value.trim();
+  const password=document.getElementById("passwordInput").value.trim();
+  if(!username||!password){document.getElementById("error").innerText="Введите логин и пароль";return;}
+  const res=await fetch("/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+  const data=await res.json();
+  if(data.success){currentUser={userId:data.id, username:data.username};initChatScreen();} else document.getElementById("error").innerText=data.error;
+}
+
+async function login(){
+  const username=document.getElementById("usernameInput").value.trim();
+  const password=document.getElementById("passwordInput").value.trim();
+  if(!username||!password){document.getElementById("error").innerText="Введите логин и пароль";return;}
+  const res=await fetch("/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username,password})});
+  const data=await res.json();
+  if(data.success){currentUser={userId:data.id, username:data.username};initChatScreen();} else document.getElementById("error").innerText=data.error;
+}
+
+async function initChatScreen(){
+  document.getElementById("loginScreen").classList.add("hidden");
+  const chatScreen=document.getElementById("chatScreen");
+  chatScreen.style.display="flex";
+  document.body.classList.remove("lock-scroll");
+  await loadUsers();
+  await loadChats();
+  const firstChat=document.querySelector(".chatItem");
+  if(firstChat) firstChat.click();
+}
+
+async function loadUsers(){ usersList=await (await fetch("/users")).json(); }
+
+async function loadChats(){
+  const data=await (await fetch(`/data/${currentUser.userId}`)).json();
+  const container=document.getElementById("chatsContainer");
+  container.innerHTML="";
+  data.chats.forEach(chat=>{
+    const div=document.createElement("div");
+    div.classList.add("chatItem");
+    div.innerText=`Чат ${chat.id}`;
+    div.onclick=()=>openChat(chat.id);
+    container.appendChild(div);
+  });
+}
+
+function openChat(chatId){
+  currentChatId=chatId;
+  const messagesDiv=document.getElementById("messages");
+  messagesDiv.innerHTML="";
+  fetch(`/data/${currentUser.userId}`).then(res=>res.json()).then(data=>{
+    const chat=data.chats.find(c=>c.id===chatId);
+    if(chat && chat.messages){
+      chat.messages.forEach(m=>addMessage(m));
+      messagesDiv.scrollTo({top:messagesDiv.scrollHeight, behavior:"smooth"});
+    }
+  });
+}
+
+function sendMessage(){
+  const msg=document.getElementById("messageInput").value;
+  if(!msg||!currentChatId) return;
+  const data={chatId:currentChatId, userId:currentUser.userId, text:msg};
+  socket.emit("chat message", data);
+  addMessage(data);
+  document.getElementById("messageInput").value="";
+}
+
+function addMessage(m){
+  const div=document.createElement("div");
+  div.classList.add("message");
+  div.classList.add(m.userId===currentUser.userId?"self":"other");
+  const sender=m.userId===currentUser.userId?"Я":`Пользователь ${m.userId}`;
+  div.innerText=`${sender}: ${m.text}`;
+  const messagesDiv=document.getElementById("messages");
+  messagesDiv.appendChild(div);
+  messagesDiv.scrollTo({top:messagesDiv.scrollHeight, behavior:"smooth"});
+}
+
+async function addUser(){
+  const username=prompt("Введите username");
+  if(!username) return;
+  const user=usersList.find(u=>u.username===username);
+  if(!user){ alert("Пользователь не найден"); return;}
+  const res=await fetch("/createChat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({members:[currentUser.userId,user.id]})});
+  const data=await res.json();
+  if(data.success){ loadChats(); openChat(data.chat.id);}
+}
+
+socket.on("chat message", data=>{
+  if(data.chatId===currentChatId && data.userId!==currentUser.userId) addMessage(data);
+});
+
+document.getElementById("registerBtn").onclick=register;
+document.getElementById("loginBtn").onclick=login;
+document.getElementById("addUserBtn").onclick=addUser;
+document.getElementById("sendBtn").onclick=sendMessage;
+
+});
+</script>
+</body>
+</html>

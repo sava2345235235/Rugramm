@@ -1,0 +1,11 @@
+http://localhost:3000
+cd C:\Users\reai.bik\my-messenger
+node server.js
+---------------------
+разроботчик
+ПОРОЛЬ
+2281488
+---------------------
+h
+ПОРОЛЬ
+1488

@@ -21,5 +21,11 @@
     "id": 4,
     "username": "рр",
     "password": "12344321"
+  },
+  {
+    "id": 5,
+    "username": "разработчик",
+    "password": "2281488",
+    "avatar": "/uploads/default.png"
   }
 ]

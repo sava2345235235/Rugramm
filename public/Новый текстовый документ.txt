@@ -1,4 +1,5 @@
 http://localhost:3000
+rugramm-production.up.railway.app
 cd C:\Users\reai.bik\my-messenger
 node server.js
 ---------------------

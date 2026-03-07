@@ -2,14 +2,15 @@
   {
     "id": 1,
     "members": [
-      3,
-      1
+      1,
+      3
     ],
     "messages": [
       {
         "userId": 3,
         "text": "привет",
-        "time": 1772870161834
+        "time": 1772870161834,
+        "status": "read"
       },
       {
         "userId": 1,
@@ -19,7 +20,8 @@
       {
         "userId": 3,
         "text": "бля да ваше пизда",
-        "time": 1772870188325
+        "time": 1772870188325,
+        "status": "read"
       },
       {
         "userId": 1,
@@ -29,7 +31,8 @@
       {
         "userId": 3,
         "text": "да вот бля свой месенджер сделал",
-        "time": 1772870219547
+        "time": 1772870219547,
+        "status": "read"
       },
       {
         "userId": 1,
@@ -39,7 +42,8 @@
       {
         "userId": 3,
         "text": "да такчто так",
-        "time": 1772870243550
+        "time": 1772870243550,
+        "status": "read"
       },
       {
         "userId": 1,
@@ -49,12 +53,59 @@
       {
         "userId": 3,
         "text": "лад давай по делам пойду",
-        "time": 1772870261814
+        "time": 1772870261814,
+        "status": "read"
       },
       {
         "userId": 1,
         "text": "ок",
         "time": 1772870265968
+      },
+      {
+        "userId": 1,
+        "text": "ааа",
+        "status": "sent",
+        "time": 1772881590861
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892463569
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892465281
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892465587
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892465747
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892465899
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892518641
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892519049
+      },
+      {
+        "userId": 1,
+        "text": "",
+        "time": 1772892519360
       }
     ]
   },
@@ -63,6 +114,118 @@
     "members": [
       1,
       3
+    ],
+    "messages": []
+  },
+  {
+    "id": 3,
+    "members": [
+      1,
+      2
+    ],
+    "messages": []
+  },
+  {
+    "id": 4,
+    "members": [
+      1,
+      3
+    ],
+    "messages": []
+  },
+  {
+    "id": 5,
+    "members": [
+      1,
+      2
+    ],
+    "messages": []
+  },
+  {
+    "id": 6,
+    "members": [
+      1,
+      4
+    ],
+    "messages": []
+  },
+  {
+    "id": 7,
+    "members": [
+      1,
+      3
+    ],
+    "messages": []
+  },
+  {
+    "id": 8,
+    "members": [
+      1,
+      2
+    ],
+    "messages": []
+  },
+  {
+    "id": 9,
+    "members": [
+      1,
+      3
+    ],
+    "messages": []
+  },
+  {
+    "id": 10,
+    "members": [
+      1,
+      2
+    ],
+    "messages": []
+  },
+  {
+    "id": 11,
+    "members": [
+      1,
+      3
+    ],
+    "messages": []
+  },
+  {
+    "id": 12,
+    "members": [
+      1,
+      3
+    ],
+    "messages": []
+  },
+  {
+    "id": 13,
+    "members": [
+      1,
+      4
+    ],
+    "messages": []
+  },
+  {
+    "id": 14,
+    "members": [
+      1,
+      3
+    ],
+    "messages": []
+  },
+  {
+    "id": 15,
+    "members": [
+      1,
+      2
+    ],
+    "messages": []
+  },
+  {
+    "id": 16,
+    "members": [
+      1,
+      5
     ],
     "messages": []
   }

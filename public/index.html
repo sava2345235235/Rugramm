@@ -1,201 +1,427 @@
 <!DOCTYPE html>
 <html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rugramm Messenger</title>
-<style>
-  body { font-family: Arial; margin: 0; padding: 0; display: flex; height: 100vh; background: #f4f6f8; }
-  #sidebar { width: 300px; border-right: 1px solid #ccc; padding: 10px; box-sizing: border-box; overflow-y: auto; background: #fff; }
-  #chat { flex: 1; display: flex; flex-direction: column; background: #e8ebef; }
-  #messages { flex: 1; padding: 10px; overflow-y: auto; }
-  #sendForm { display: flex; padding: 10px; background: #fff; }
-  #sendForm input { flex: 1; padding: 5px; border-radius: 5px; border: 1px solid #ccc; margin-right: 5px; }
-  #sendForm button { padding: 5px 10px; border-radius: 5px; border: none; background: #007bff; color: white; cursor: pointer; }
-  .user { cursor: pointer; padding: 5px; border-bottom: 1px solid #eee; display: flex; align-items: center; }
-  .user img { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; }
-  .message { margin-bottom: 10px; padding: 5px 10px; border-radius: 10px; background: #fff; max-width: 70%; }
-  .my { background: #007bff; color: white; margin-left: auto; }
-  #emojiPanel { display: none; flex-wrap: wrap; border: 1px solid #ccc; padding: 5px; background: #fff; position: absolute; bottom: 50px; right: 20px; width: 200px; }
-  .emoji { cursor: pointer; padding: 5px; font-size: 20px; }
 
-  /* Модальное окно авторизации */
-  #authModal { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:10; }
-  #authModalContent { background:#fff; padding:20px; border-radius:10px; width:300px; text-align:center; }
-  #authModalContent input { width:90%; padding:5px; margin:5px 0; border-radius:5px; border:1px solid #ccc; }
-  #authModalContent button { padding:5px 10px; margin:5px; border:none; border-radius:5px; cursor:pointer; }
-  #registerForm { display:none; }
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>Rugram</title>
+
+<style>
+
+body{
+margin:0;
+font-family:system-ui;
+background:#0f172a;
+color:white;
+display:flex;
+height:100vh;
+}
+
+/* SIDEBAR */
+
+#sidebar{
+width:300px;
+background:#111827;
+display:flex;
+flex-direction:column;
+border-right:1px solid #1f2937;
+}
+
+header{
+padding:15px;
+font-size:18px;
+border-bottom:1px solid #1f2937;
+}
+
+.user{
+display:flex;
+align-items:center;
+gap:10px;
+padding:12px;
+cursor:pointer;
+border-bottom:1px solid #1f2937;
+}
+
+.user:hover{
+background:#1f2937;
+}
+
+.avatar{
+width:35px;
+height:35px;
+border-radius:50%;
+background:#3b82f6;
+display:flex;
+align-items:center;
+justify-content:center;
+font-weight:bold;
+}
+
+.status{
+width:10px;
+height:10px;
+border-radius:50%;
+margin-left:auto;
+}
+
+.online{
+background:#22c55e;
+}
+
+.offline{
+background:#6b7280;
+}
+
+/* CHAT */
+
+#chat{
+flex:1;
+display:flex;
+flex-direction:column;
+}
+
+#messages{
+flex:1;
+overflow:auto;
+padding:20px;
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+
+.message{
+max-width:65%;
+padding:10px;
+border-radius:10px;
+background:#1e293b;
+}
+
+.my{
+align-self:flex-end;
+background:#3b82f6;
+}
+
+.messageInfo{
+font-size:11px;
+opacity:0.7;
+margin-top:5px;
+text-align:right;
+}
+
+/* SEND */
+
+#sendForm{
+display:flex;
+gap:8px;
+padding:10px;
+background:#111827;
+border-top:1px solid #1f2937;
+}
+
+#messageInput{
+flex:1;
+padding:8px;
+border-radius:6px;
+border:none;
+background:#1f2937;
+color:white;
+}
+
+button{
+background:#3b82f6;
+border:none;
+padding:8px 12px;
+color:white;
+border-radius:6px;
+cursor:pointer;
+}
+
+#emojiPanel{
+display:none;
+flex-wrap:wrap;
+position:absolute;
+bottom:70px;
+right:20px;
+background:#111827;
+padding:10px;
+border-radius:10px;
+width:200px;
+}
+
+.emoji{
+cursor:pointer;
+font-size:20px;
+margin:3px;
+}
+
+/* MOBILE */
+
+@media(max-width:700px){
+
+body{
+flex-direction:column;
+}
+
+#sidebar{
+width:100%;
+height:40%;
+}
+
+#chat{
+height:60%;
+}
+
+}
+
 </style>
+
 </head>
+
 <body>
 
-<!-- Модальное окно авторизации/регистрации -->
-<div id="authModal">
-  <div id="authModalContent">
-    <div id="loginForm">
-      <h3>Вход</h3>
-      <input type="text" id="loginUsername" placeholder="Имя пользователя"><br>
-      <input type="password" id="loginPassword" placeholder="Пароль"><br>
-      <button id="loginBtn">Войти</button>
-      <p>Нет аккаунта? <a href="#" id="showRegister">Зарегистрироваться</a></p>
-    </div>
-    <div id="registerForm">
-      <h3>Регистрация</h3>
-      <input type="text" id="regUsername" placeholder="Имя пользователя"><br>
-      <input type="password" id="regPassword" placeholder="Пароль"><br>
-      <button id="registerBtn">Создать аккаунт</button>
-      <p>Уже есть аккаунт? <a href="#" id="showLogin">Войти</a></p>
-    </div>
-  </div>
-</div>
-
 <div id="sidebar">
-  <h3>Пользователи</h3>
-  <div id="usersList"></div>
+
+<header>Rugram</header>
+
+<div id="users"></div>
+
+<button onclick="logout()">Выйти</button>
+
 </div>
 
 <div id="chat">
-  <div id="messages"></div>
-  <div id="emojiPanel"></div>
-  <form id="sendForm">
-    <input type="text" id="messageInput" placeholder="Сообщение" disabled>
-    <button type="button" id="emojiBtn">😊</button>
-    <input type="file" id="fileInput">
-    <button type="submit" disabled>Отправить</button>
-  </form>
+
+<div id="messages"></div>
+
+<div id="emojiPanel"></div>
+
+<form id="sendForm">
+
+<input id="messageInput" placeholder="Сообщение">
+
+<button type="button" id="emojiBtn">😊</button>
+
+<input type="file" id="fileInput">
+
+<button>➤</button>
+
+</form>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
+
 <script>
-const socket = io();
-let currentUser = null;
-let currentChat = null;
 
-// Смайлики
-const emojis = ["😀","😂","😍","😎","😭","👍","🙏","🎉","💖","🤔"];
-const emojiPanel = document.getElementById("emojiPanel");
+const socket = io()
 
-// Показ/скрытие смайликов
-document.getElementById("emojiBtn").onclick = ()=>{
-  emojiPanel.style.display = emojiPanel.style.display==="flex"?"none":"flex";
-}
-emojis.forEach(e=>{
-  const span = document.createElement("span");
-  span.className="emoji";
-  span.textContent=e;
-  span.onclick = ()=>{ document.getElementById("messageInput").value+=e; }
-  emojiPanel.appendChild(span);
-});
+const saved = localStorage.getItem("user")
 
-// Авторизация
-document.getElementById("loginBtn").onclick = async ()=>{
-  const username = document.getElementById("loginUsername").value;
-  const password = document.getElementById("loginPassword").value;
-  const res = await fetch("/login",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,password})});
-  const data = await res.json();
-  if(data.success){
-    currentUser = data;
-    document.getElementById("sendForm").querySelector("input").disabled=false;
-    document.getElementById("sendForm").querySelector("button[type=submit]").disabled=false;
-    document.getElementById("authModal").style.display="none";
-    socket.emit("login",currentUser.id);
-    loadUsers();
-  } else alert(data.error);
+if(!saved){
+
+location.href="/login.html"
+
 }
 
-// Показ формы регистрации
-document.getElementById("showRegister").onclick = ()=>{
-  document.getElementById("loginForm").style.display="none";
-  document.getElementById("registerForm").style.display="block";
-}
-// Показ формы входа
-document.getElementById("showLogin").onclick = ()=>{
-  document.getElementById("loginForm").style.display="block";
-  document.getElementById("registerForm").style.display="none";
-}
+const currentUser = JSON.parse(saved)
 
-// Регистрация
-document.getElementById("registerBtn").onclick = async ()=>{
-  const username = document.getElementById("regUsername").value;
-  const password = document.getElementById("regPassword").value;
-  const res = await fetch("/register",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username,password})});
-  const data = await res.json();
-  if(data.success){
-    alert("Пользователь создан!");
-    document.getElementById("loginForm").style.display="block";
-    document.getElementById("registerForm").style.display="none";
-  } else alert(data.error);
-}
+socket.emit("login",currentUser.id)
 
-// Загрузка пользователей
+let currentChat=null
+
+/* USERS */
+
 async function loadUsers(){
-  const res = await fetch("/users");
-  const users = await res.json();
-  const list = document.getElementById("usersList");
-  list.innerHTML="";
-  users.forEach(u=>{
-    if(currentUser && u.id!==currentUser.id){
-      const div = document.createElement("div");
-      div.className="user";
-      div.innerHTML=`<img src="${u.avatar}"> ${u.username} ${u.online?"(online)":""}`;
-      div.onclick = ()=>createChat([currentUser.id,u.id]);
-      list.appendChild(div);
-    }
-  });
+
+const res=await fetch("/users")
+
+const users=await res.json()
+
+const list=document.getElementById("users")
+
+list.innerHTML=""
+
+users.forEach(u=>{
+
+if(u.id!==currentUser.id){
+
+const div=document.createElement("div")
+
+div.className="user"
+
+div.innerHTML=`
+
+<div class="avatar">${u.username[0]}</div>
+
+${u.username}
+
+<div class="status ${u.online?"online":"offline"}"></div>
+
+`
+
+div.onclick=()=>createChat(u.id)
+
+list.appendChild(div)
+
 }
 
-// Создание чата
-async function createChat(members){
-  const res = await fetch("/createChat",{method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({members})});
-  const data = await res.json();
-  if(data.success){
-    currentChat = data.chat;
-    loadMessages();
-  }
+})
+
 }
 
-// Загрузка сообщений
+loadUsers()
+
+socket.on("onlineUpdate",loadUsers)
+
+/* CREATE CHAT */
+
+async function createChat(userId){
+
+const res=await fetch("/createChat",{
+
+method:"POST",
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({
+
+members:[currentUser.id,userId]
+
+})
+
+})
+
+const data=await res.json()
+
+currentChat=data.chat
+
+loadMessages()
+
+}
+
+/* LOAD MESSAGES */
+
 async function loadMessages(){
-  if(!currentChat) return;
-  const res = await fetch(`/data/${currentUser.id}`);
-  const data = await res.json();
-  const chatData = data.chats.find(c=>c.id===currentChat.id);
-  const messagesDiv = document.getElementById("messages");
-  messagesDiv.innerHTML="";
-  chatData.messages.forEach(m=>{
-    const div = document.createElement("div");
-    div.className="message "+(m.userId===currentUser.id?"my":"");
-    div.textContent=m.text;
-    if(m.file){
-      const a=document.createElement("a");
-      a.href=m.file;
-      a.target="_blank";
-      a.textContent="[Файл]";
-      div.appendChild(document.createElement("br"));
-      div.appendChild(a);
-    }
-    messagesDiv.appendChild(div);
-  });
-  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+if(!currentChat)return
+
+const res=await fetch("/data/"+currentUser.id)
+
+const data=await res.json()
+
+const chat=data.chats.find(c=>c.id===currentChat.id)
+
+const box=document.getElementById("messages")
+
+box.innerHTML=""
+
+chat.messages.forEach(m=>{
+
+const div=document.createElement("div")
+
+div.className="message "+(m.userId===currentUser.id?"my":"")
+
+div.innerHTML=`
+
+${m.text || ""}
+
+${m.file?`<a href="${m.file}" target="_blank">📎</a>`:""}
+
+<div class="messageInfo">
+
+${m.time}
+
+${m.userId===currentUser.id?(m.read?"✔✔":"✔"):""}
+
+</div>
+
+`
+
+box.appendChild(div)
+
+})
+
+box.scrollTop=box.scrollHeight
+
 }
 
-// Отправка сообщения
+/* SEND MESSAGE */
+
 document.getElementById("sendForm").onsubmit=async e=>{
-  e.preventDefault();
-  if(!currentChat) return;
-  const text = document.getElementById("messageInput").value;
-  const file = document.getElementById("fileInput").files[0];
-  const form = new FormData();
-  form.append("chatId",currentChat.id);
-  form.append("userId",currentUser.id);
-  form.append("text",text);
-  if(file) form.append("file",file);
-  await fetch("/sendMessage",{method:"POST",body:form});
-  document.getElementById("messageInput").value="";
-  document.getElementById("fileInput").value="";
-  loadMessages();
+
+e.preventDefault()
+
+if(!currentChat)return
+
+const text=document.getElementById("messageInput").value
+const file=document.getElementById("fileInput").files[0]
+
+const form=new FormData()
+
+form.append("chatId",currentChat.id)
+form.append("userId",currentUser.id)
+form.append("text",text)
+
+if(file) form.append("file",file)
+
+await fetch("/sendMessage",{
+
+method:"POST",
+body:form
+
+})
+
+document.getElementById("messageInput").value=""
+document.getElementById("fileInput").value=""
+
+loadMessages()
+
 }
+
+/* EMOJI */
+
+const emojis=["😀","😂","😎","😍","😭","🔥","❤️","👍","🎉","😅","🥳","🤔"]
+
+const panel=document.getElementById("emojiPanel")
+
+emojis.forEach(e=>{
+
+const span=document.createElement("span")
+
+span.className="emoji"
+
+span.textContent=e
+
+span.onclick=()=>{
+
+document.getElementById("messageInput").value+=e
+
+}
+
+panel.appendChild(span)
+
+})
+
+document.getElementById("emojiBtn").onclick=()=>{
+
+panel.style.display=
+panel.style.display==="flex"?"none":"flex"
+
+}
+
+/* LOGOUT */
+
+function logout(){
+
+localStorage.removeItem("user")
+
+location.href="/login.html"
+
+}
+
 </script>
 
 </body>
+
 </html>

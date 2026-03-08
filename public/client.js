@@ -138,38 +138,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Logout function
   function logout() {
-    // Очищаем данные пользователя из localStorage
     localStorage.removeItem("currentUser");
-    
-    // Очищаем текущие данные
     currentUser = null;
     currentChat = null;
     users = [];
     chats = [];
-    
-    // Отключаем сокет
     socket.disconnect();
-    
-    // Переключаем экраны
     chatScreen.classList.add("hidden");
     loginScreen.classList.remove("hidden");
-    
-    // Очищаем поля ввода
     usernameInput.value = "";
     passwordInput.value = "";
     errorP.innerText = "";
-    
-    // Очищаем сообщения
     messagesDiv.innerHTML = "";
-    
-    // Очищаем список чатов
     chatsContainer.innerHTML = "";
-    
-    // Сбрасываем заголовок чата
     chatName.textContent = "Выберите чат";
     chatStatus.textContent = "";
-    
-    console.log("Пользователь вышел из аккаунта");
   }
 
   // Init chat screen
@@ -279,33 +262,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     messages.forEach(msg => {
-      const div = document.createElement("div");
-      div.className = `message ${msg.userId === currentUser.id ? 'self' : 'other'}`;
-
-      let content = '';
-      
-      if (msg.userId !== currentUser.id) {
-        const sender = users.find(u => u.id === msg.userId);
-        content += `<div class="message-sender">${sender?.username || 'Пользователь'}</div>`;
-      }
-
-      if (msg.text) {
-        content += `<div class="message-text">${msg.text}</div>`;
-      }
-
-      if (msg.file) {
-        content += `<div class="message-file"><a href="${msg.file}" target="_blank">📎 Файл</a></div>`;
-      }
-
-      const readStatus = msg.read ? '✔✔' : '✔';
-      content += `<div class="message-time">${msg.time} <span class="message-status">${msg.userId === currentUser.id ? readStatus : ''}</span></div>`;
-
-      div.innerHTML = content;
-      div.dataset.id = msg.id;
-      messagesDiv.appendChild(div);
+      addMessageToDOM(msg);
     });
 
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  // Add single message to DOM
+  function addMessageToDOM(msg) {
+    const div = document.createElement("div");
+    div.className = `message ${msg.userId === currentUser.id ? 'self' : 'other'}`;
+
+    let content = '';
+    
+    if (msg.userId !== currentUser.id) {
+      const sender = users.find(u => u.id === msg.userId);
+      content += `<div class="message-sender">${sender?.username || 'Пользователь'}</div>`;
+    }
+
+    if (msg.text) {
+      content += `<div class="message-text">${msg.text}</div>`;
+    }
+
+    if (msg.file) {
+      content += `<div class="message-file"><a href="${msg.file}" target="_blank">📎 Файл</a></div>`;
+    }
+
+    const readStatus = msg.read ? '✔✔' : '✔';
+    content += `<div class="message-time">${msg.time} <span class="message-status">${msg.userId === currentUser.id ? readStatus : ''}</span></div>`;
+
+    div.innerHTML = content;
+    div.dataset.id = msg.id;
+    messagesDiv.appendChild(div);
   }
 
   // Send message
@@ -339,13 +327,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.success) {
         messageInput.value = "";
         fileInput.value = "";
-        await loadChats();
-        if (currentChat) {
-          const updatedChat = chats.find(c => c.id === currentChat.id);
-          if (updatedChat) {
-            renderMessages(updatedChat.messages);
-          }
-        }
+        
+        // Не перезагружаем все сообщения, добавляем новое через сокет
+        // Сервер сам отправит его через socket.io
       }
     } catch (err) {
       console.error("Error sending message:", err);
@@ -429,31 +413,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Socket events
   socket.on("newMessage", (data) => {
+    console.log("New message received:", data);
+    
+    // Если это сообщение для текущего чата, добавляем его сразу
     if (data.chatId === currentChat?.id) {
-      loadChats().then(() => {
-        const updatedChat = chats.find(c => c.id === currentChat.id);
-        if (updatedChat) {
-          renderMessages(updatedChat.messages);
-        }
-      });
-    } else {
-      loadChats();
+      addMessageToDOM(data.message);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      
+      // Отмечаем как прочитанное
+      socket.emit("message read", { chatId: currentChat.id, userId: currentUser.id });
     }
+    
+    // Обновляем список чатов (для отображения последнего сообщения)
+    loadChats();
   });
 
   socket.on("chat message", (data) => {
+    console.log("Chat message received:", data);
+    
     if (data.chatId === currentChat?.id) {
-      addMessageToCurrent(data);
+      addMessageToDOM(data);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
     loadChats();
   });
 
   socket.on("messages read", (data) => {
+    console.log("Messages read:", data);
+    
     if (data.chatId === currentChat?.id) {
-      loadChats().then(() => {
-        const updatedChat = chats.find(c => c.id === currentChat.id);
-        if (updatedChat) {
-          renderMessages(updatedChat.messages);
+      // Обновляем статусы сообщений в текущем чате
+      const messageElements = messagesDiv.querySelectorAll(".message");
+      messageElements.forEach(el => {
+        const statusSpan = el.querySelector(".message-status");
+        if (statusSpan) {
+          statusSpan.textContent = "✔✔";
         }
       });
     }
@@ -473,35 +467,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   });
-
-  function addMessageToCurrent(message) {
-    if (!currentChat) return;
-
-    const div = document.createElement("div");
-    div.className = `message ${message.userId === currentUser.id ? 'self' : 'other'}`;
-
-    let content = '';
-    
-    if (message.userId !== currentUser.id) {
-      const sender = users.find(u => u.id === message.userId);
-      content += `<div class="message-sender">${sender?.username || 'Пользователь'}</div>`;
-    }
-
-    if (message.text) {
-      content += `<div class="message-text">${message.text}</div>`;
-    }
-
-    if (message.file) {
-      content += `<div class="message-file"><a href="${message.file}" target="_blank">📎 Файл</a></div>`;
-    }
-
-    content += `<div class="message-time">${message.time}</div>`;
-
-    div.innerHTML = content;
-    div.dataset.id = message.id;
-    messagesDiv.appendChild(div);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  }
 
   // Event listeners
   registerBtn.onclick = register;

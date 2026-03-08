@@ -166,14 +166,18 @@ app.post("/sendMessage", upload.single("file"), (req, res) => {
     time: new Date().toLocaleTimeString(),
     timestamp: Date.now(),
     read: false,
-    readBy: []
+    readBy: [userId]
   };
 
   chat.messages.push(message);
   saveData();
 
-  // Отправляем уведомление всем в чате
-  io.to(chatId).emit("newMessage", { chatId, message });
+  // Отправляем сообщение всем в комнате чата
+  io.to(chatId).emit("newMessage", { 
+    chatId, 
+    message,
+    userId: userId
+  });
 
   res.json({ success: true, message });
 });
@@ -246,6 +250,7 @@ io.on("connection", (socket) => {
     chat.messages.push(message);
     saveData();
 
+    // Отправляем сообщение всем в комнате
     io.to(chatId).emit("chat message", { ...message, chatId });
   });
 
@@ -255,18 +260,22 @@ io.on("connection", (socket) => {
     const chat = chats.find(c => c.id === chatId);
     if (!chat) return;
 
+    let updated = false;
     chat.messages.forEach(msg => {
       if (msg.userId !== userId && !msg.read) {
         msg.read = true;
         msg.readBy = msg.readBy || [];
         if (!msg.readBy.includes(userId)) {
           msg.readBy.push(userId);
+          updated = true;
         }
       }
     });
 
-    saveData();
-    io.to(chatId).emit("messages read", { chatId, userId });
+    if (updated) {
+      saveData();
+      io.to(chatId).emit("messages read", { chatId, userId });
+    }
   });
 
   socket.on("disconnect", () => {

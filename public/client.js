@@ -10,7 +10,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedSettings = localStorage.getItem("userSettings");
   if (savedSettings) {
     userSettings = JSON.parse(savedSettings);
-    applyTheme(userSettings.theme || 'light');
   }
 
   // DOM Elements
@@ -59,14 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const avatarUpload = document.getElementById("avatarUpload");
   const saveSettings = document.getElementById("saveSettings");
   const closeSettings = document.getElementById("closeSettings");
-
-  // Profile modal (keep for backward compatibility)
-  const profileModal = document.getElementById("profileModal");
-  const closeProfile = document.getElementById("closeProfile");
-  const saveProfile = document.getElementById("saveProfile");
-  const profileName = document.getElementById("profileName");
-  const profilePhoto = document.getElementById("profilePhoto");
-  const profileAvatar = document.getElementById("profileAvatar");
 
   // Check saved user
   const savedUser = localStorage.getItem("currentUser");
@@ -151,7 +142,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Show loading
     userSearchResults.innerHTML = '<div class="spinner"></div>';
 
     searchUserTimeout = setTimeout(() => {
@@ -160,7 +150,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function searchUsers(query) {
-    // Remove @ if present
     const searchTerm = query.startsWith('@') ? query.substring(1) : query;
     
     const filteredUsers = users.filter(user => 
@@ -188,10 +177,8 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
     `).join('');
 
-    // Add click handlers
     document.querySelectorAll('.user-search-item').forEach(item => {
       item.addEventListener('click', () => {
-        const userId = item.dataset.userId;
         const username = item.dataset.username;
         addUsernameInput.value = '@' + username;
         userSearchResults.innerHTML = '';
@@ -199,7 +186,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Add selected user to chat
   confirmAddUser.onclick = async () => {
     let username = addUsernameInput.value.trim();
     
@@ -208,7 +194,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Remove @ if present
     if (username.startsWith('@')) {
       username = username.substring(1);
     }
@@ -224,7 +209,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Check if chat already exists
     const existingChat = chats.find(chat => 
       chat.members.includes(currentUser.id) && 
       chat.members.includes(user.id)
@@ -262,21 +246,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Settings functionality
   function showSettingsModal() {
+    console.log("Opening settings modal");
     settingsModal.classList.remove("hidden");
     
-    // Load current user data
     settingsAvatar.src = currentUser.avatar || '/uploads/default-avatar.png';
     settingsUsername.value = currentUser.username;
     settingsUsernameDisplay.textContent = currentUser.username;
     settingsUserId.textContent = currentUser.id;
     settingsCreatedAt.textContent = currentUser.createdAt || new Date().toLocaleDateString();
     
-    // Load settings
     notificationSound.checked = userSettings.notificationSound !== false;
     themeSelect.value = userSettings.theme || 'light';
   }
 
-  // Handle avatar upload
   avatarUpload.addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -288,7 +270,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Save settings
   saveSettings.onclick = async () => {
     const newUsername = settingsUsername.value.trim();
     const newAvatar = settingsAvatar.src;
@@ -298,9 +279,7 @@ document.addEventListener("DOMContentLoaded", () => {
       userName.textContent = newUsername;
     }
 
-    // Update avatar if changed
     if (newAvatar !== currentUser.avatar && newAvatar.startsWith('data:')) {
-      // Convert base64 to blob and upload
       const blob = await fetch(newAvatar).then(r => r.blob());
       const formData = new FormData();
       formData.append("avatar", blob, "avatar.png");
@@ -324,7 +303,6 @@ document.addEventListener("DOMContentLoaded", () => {
       userAvatar.src = newAvatar;
     }
 
-    // Save settings
     userSettings = {
       ...userSettings,
       notificationSound: notificationSound.checked,
@@ -334,10 +312,6 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem("userSettings", JSON.stringify(userSettings));
     localStorage.setItem("currentUser", JSON.stringify(currentUser));
 
-    // Apply theme
-    applyTheme(themeSelect.value);
-
-    // Update profile on server
     try {
       await fetch("/updateProfile", {
         method: "POST",
@@ -358,33 +332,6 @@ document.addEventListener("DOMContentLoaded", () => {
   closeSettings.onclick = () => {
     settingsModal.classList.add("hidden");
   };
-
-  function applyTheme(theme) {
-    if (theme === 'dark') {
-      document.body.style.background = '#1a202c';
-      document.body.style.color = '#f7fafc';
-    } else if (theme === 'light') {
-      document.body.style.background = '#fff';
-      document.body.style.color = '#1a1a1a';
-    } else {
-      // System theme
-      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.body.style.background = '#1a202c';
-        document.body.style.color = '#f7fafc';
-      } else {
-        document.body.style.background = '#fff';
-        document.body.style.color = '#1a1a1a';
-      }
-    }
-  }
-
-  // Play notification sound
-  function playNotificationSound() {
-    if (userSettings.notificationSound !== false) {
-      const audio = new Audio('/sounds/notification.mp3');
-      audio.play().catch(() => {});
-    }
-  }
 
   // Register
   async function register() {
@@ -507,7 +454,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       chats = data.chats || [];
       
-      // Sort chats by last message time
       chats.sort((a, b) => {
         const aTime = a.messages[a.messages.length - 1]?.timestamp || 0;
         const bTime = b.messages[b.messages.length - 1]?.timestamp || 0;
@@ -520,7 +466,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Render chats
   function renderChats(chatsToRender) {
     chatsContainer.innerHTML = "";
     pinnedContainer.innerHTML = "";
@@ -535,17 +480,14 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Separate pinned and regular chats
     const pinned = chatsToRender.filter(chat => chat.pinned);
     const regular = chatsToRender.filter(chat => !chat.pinned);
 
-    // Render pinned chats
     pinned.forEach(chat => {
       const element = createChatElement(chat, true);
       pinnedContainer.appendChild(element);
     });
 
-    // Render regular chats
     regular.forEach(chat => {
       const element = createChatElement(chat, false);
       chatsContainer.appendChild(element);
@@ -607,14 +549,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const now = new Date();
     const diff = now - date;
     
-    if (diff < 86400000) { // Less than 24 hours
+    if (diff < 86400000) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else {
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
   }
 
-  // Open chat
   async function openChat(chat) {
     currentChat = chat;
     
@@ -627,10 +568,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     renderMessages(chat.messages);
 
-    // Mark messages as read
     socket.emit("message read", { chatId: chat.id, userId: currentUser.id });
     
-    // Close sidebar on mobile
     if (window.innerWidth <= 768) {
       sidebar.classList.remove("show");
     }
@@ -638,7 +577,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderChats(chats);
   }
 
-  // Render messages
   function renderMessages(messages) {
     messagesDiv.innerHTML = "";
 
@@ -659,7 +597,6 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
 
-  // Add single message to DOM
   function addMessageToDOM(msg) {
     const messageDiv = document.createElement("div");
     messageDiv.className = `message ${msg.userId === currentUser.id ? 'self' : 'other'}`;
@@ -689,7 +626,6 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.appendChild(messageDiv);
   }
 
-  // Send message
   async function sendMessage(e) {
     e.preventDefault();
 
@@ -726,46 +662,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Profile (updated to show settings instead of old profile modal)
+  // Profile click opens settings (ЭТО ГЛАВНОЕ)
   userProfile.onclick = () => {
     showSettingsModal();
   };
 
-  // Keep old profile modal for backward compatibility
-  closeProfile.onclick = () => {
-    profileModal.classList.add("hidden");
-  };
-
-  saveProfile.onclick = async () => {
-    const newName = profileName.value.trim();
-    const newAvatar = profilePhoto.value.trim();
-
-    if (newName) currentUser.username = newName;
-    if (newAvatar) currentUser.avatar = newAvatar;
-
-    userAvatar.src = currentUser.avatar;
-    userName.textContent = currentUser.username;
-    profileAvatar.src = currentUser.avatar;
-    
-    localStorage.setItem("currentUser", JSON.stringify(currentUser));
-    profileModal.classList.add("hidden");
-
-    try {
-      await fetch("/updateProfile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: currentUser.id,
-          username: currentUser.username,
-          avatar: currentUser.avatar
-        })
-      });
-    } catch (err) {
-      console.error("Error updating profile:", err);
-    }
-  };
-
-  // Socket events
   socket.on("newMessage", (data) => {
     console.log("New message received:", data);
     
@@ -773,11 +674,6 @@ document.addEventListener("DOMContentLoaded", () => {
       addMessageToDOM(data.message);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       socket.emit("message read", { chatId: currentChat.id, userId: currentUser.id });
-    }
-    
-    // Play notification sound if not in current chat
-    if (data.chatId !== currentChat?.id) {
-      playNotificationSound();
     }
     
     loadChats();
@@ -810,46 +706,32 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Event listeners
   registerBtn.onclick = register;
   loginBtn.onclick = login;
   logoutBtn.onclick = logout;
   sendForm.onsubmit = sendMessage;
 
-  // Add user button
   const addUserBtn = document.createElement("button");
   addUserBtn.className = "add-user-btn";
   addUserBtn.innerHTML = "+";
   addUserBtn.onclick = showAddUserModal;
   document.body.appendChild(addUserBtn);
 
-  // Click outside emoji panel
   document.addEventListener("click", (e) => {
     if (!emojiBtn.contains(e.target) && !emojiPanel.contains(e.target)) {
       emojiPanel.classList.remove("show");
     }
   });
 
-  // Handle window resize
   window.addEventListener("resize", () => {
     if (window.innerWidth > 768) {
       sidebar.classList.remove("show");
     }
   });
 
-  // Close modals when clicking outside
   window.addEventListener("click", (e) => {
     if (e.target.classList.contains('modal')) {
       e.target.classList.add('hidden');
     }
   });
-
-  // Listen for system theme changes
-  if (window.matchMedia) {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-      if (userSettings.theme === 'system') {
-        applyTheme('system');
-      }
-    });
-  }
 });

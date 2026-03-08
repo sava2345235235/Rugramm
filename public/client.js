@@ -4,6 +4,14 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentChat = null;
   let users = [];
   let chats = [];
+  let userSettings = {};
+
+  // Load user settings from localStorage
+  const savedSettings = localStorage.getItem("userSettings");
+  if (savedSettings) {
+    userSettings = JSON.parse(savedSettings);
+    applyTheme(userSettings.theme || 'light');
+  }
 
   // DOM Elements
   const loginScreen = document.getElementById("loginScreen");
@@ -39,7 +47,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const confirmAddUser = document.getElementById("confirmAddUser");
   const closeAddUser = document.getElementById("closeAddUser");
 
-  // Profile modal
+  // Settings Modal elements
+  const settingsModal = document.getElementById("settingsModal");
+  const settingsAvatar = document.getElementById("settingsAvatar");
+  const settingsUsername = document.getElementById("settingsUsername");
+  const settingsUsernameDisplay = document.getElementById("settingsUsernameDisplay");
+  const settingsUserId = document.getElementById("settingsUserId");
+  const settingsCreatedAt = document.getElementById("settingsCreatedAt");
+  const notificationSound = document.getElementById("notificationSound");
+  const themeSelect = document.getElementById("themeSelect");
+  const avatarUpload = document.getElementById("avatarUpload");
+  const saveSettings = document.getElementById("saveSettings");
+  const closeSettings = document.getElementById("closeSettings");
+
+  // Profile modal (keep for backward compatibility)
   const profileModal = document.getElementById("profileModal");
   const closeProfile = document.getElementById("closeProfile");
   const saveProfile = document.getElementById("saveProfile");
@@ -56,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Emojis
-  const emojis = ["😀", "😂", "😎", "😍", "😭", "🔥", "❤️", "👍", "🎉", "😅", "🥳", "🤔"];
+  const emojis = ["😀", "😂", "😎", "😍", "😭", "🔥", "❤️", "👍", "🎉", "😅", "🥳", "🤔", "👋", "🤝", "👍🏻", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇"];
   emojis.forEach(e => {
     const span = document.createElement("span");
     span.className = "emoji";
@@ -130,6 +151,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // Show loading
+    userSearchResults.innerHTML = '<div class="spinner"></div>';
+
     searchUserTimeout = setTimeout(() => {
       searchUsers(query);
     }, 300);
@@ -145,25 +169,22 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
     if (filteredUsers.length === 0) {
-      userSearchResults.innerHTML = '<div style="padding: 10px; text-align: center; color: #9ca3af;">Пользователи не найдены</div>';
+      userSearchResults.innerHTML = '<div class="empty-state"><span>😕</span><br>Пользователи не найдены</div>';
       return;
     }
 
     userSearchResults.innerHTML = filteredUsers.map(user => `
-      <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}" style="
-        padding: 10px;
-        margin: 5px 0;
-        border-radius: 8px;
-        background: #f3f4f6;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        transition: background 0.2s;
-      ">
-        <img src="${user.avatar || '/uploads/default-avatar.png'}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;">
-        <span style="flex: 1;">${user.username}</span>
-        <span style="color: ${user.online ? '#48bb78' : '#9ca3af'}; font-size: 12px;">${user.online ? '● online' : '○ offline'}</span>
+      <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
+        <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
+        <div class="user-info">
+          <div class="user-name">${user.username}</div>
+          <div class="user-status">
+            <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
+            <span style="color: ${user.online ? '#48bb78' : '#9ca3af'};">
+              ${user.online ? 'в сети' : 'не в сети'}
+            </span>
+          </div>
+        </div>
       </div>
     `).join('');
 
@@ -203,6 +224,18 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // Check if chat already exists
+    const existingChat = chats.find(chat => 
+      chat.members.includes(currentUser.id) && 
+      chat.members.includes(user.id)
+    );
+
+    if (existingChat) {
+      addUserModal.classList.add("hidden");
+      openChat(existingChat);
+      return;
+    }
+
     try {
       const res = await fetch("/createChat", {
         method: "POST",
@@ -227,6 +260,132 @@ document.addEventListener("DOMContentLoaded", () => {
     addUserModal.classList.add("hidden");
   };
 
+  // Settings functionality
+  function showSettingsModal() {
+    settingsModal.classList.remove("hidden");
+    
+    // Load current user data
+    settingsAvatar.src = currentUser.avatar || '/uploads/default-avatar.png';
+    settingsUsername.value = currentUser.username;
+    settingsUsernameDisplay.textContent = currentUser.username;
+    settingsUserId.textContent = currentUser.id;
+    settingsCreatedAt.textContent = currentUser.createdAt || new Date().toLocaleDateString();
+    
+    // Load settings
+    notificationSound.checked = userSettings.notificationSound !== false;
+    themeSelect.value = userSettings.theme || 'light';
+  }
+
+  // Handle avatar upload
+  avatarUpload.addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        settingsAvatar.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  // Save settings
+  saveSettings.onclick = async () => {
+    const newUsername = settingsUsername.value.trim();
+    const newAvatar = settingsAvatar.src;
+
+    if (newUsername && newUsername !== currentUser.username) {
+      currentUser.username = newUsername;
+      userName.textContent = newUsername;
+    }
+
+    // Update avatar if changed
+    if (newAvatar !== currentUser.avatar && newAvatar.startsWith('data:')) {
+      // Convert base64 to blob and upload
+      const blob = await fetch(newAvatar).then(r => r.blob());
+      const formData = new FormData();
+      formData.append("avatar", blob, "avatar.png");
+      formData.append("userId", currentUser.id);
+
+      try {
+        const res = await fetch("/uploadAvatar", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentUser.avatar = data.avatarUrl;
+          userAvatar.src = data.avatarUrl;
+        }
+      } catch (err) {
+        console.error("Error uploading avatar:", err);
+      }
+    } else if (newAvatar !== currentUser.avatar) {
+      currentUser.avatar = newAvatar;
+      userAvatar.src = newAvatar;
+    }
+
+    // Save settings
+    userSettings = {
+      ...userSettings,
+      notificationSound: notificationSound.checked,
+      theme: themeSelect.value
+    };
+
+    localStorage.setItem("userSettings", JSON.stringify(userSettings));
+    localStorage.setItem("currentUser", JSON.stringify(currentUser));
+
+    // Apply theme
+    applyTheme(themeSelect.value);
+
+    // Update profile on server
+    try {
+      await fetch("/updateProfile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          username: currentUser.username,
+          avatar: currentUser.avatar
+        })
+      });
+    } catch (err) {
+      console.error("Error updating profile:", err);
+    }
+
+    settingsModal.classList.add("hidden");
+  };
+
+  closeSettings.onclick = () => {
+    settingsModal.classList.add("hidden");
+  };
+
+  function applyTheme(theme) {
+    if (theme === 'dark') {
+      document.body.style.background = '#1a202c';
+      document.body.style.color = '#f7fafc';
+    } else if (theme === 'light') {
+      document.body.style.background = '#fff';
+      document.body.style.color = '#1a1a1a';
+    } else {
+      // System theme
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.style.background = '#1a202c';
+        document.body.style.color = '#f7fafc';
+      } else {
+        document.body.style.background = '#fff';
+        document.body.style.color = '#1a1a1a';
+      }
+    }
+  }
+
+  // Play notification sound
+  function playNotificationSound() {
+    if (userSettings.notificationSound !== false) {
+      const audio = new Audio('/sounds/notification.mp3');
+      audio.play().catch(() => {});
+    }
+  }
+
   // Register
   async function register() {
     const username = usernameInput.value.trim();
@@ -249,7 +408,8 @@ document.addEventListener("DOMContentLoaded", () => {
         currentUser = { 
           id: data.id, 
           username: data.username, 
-          avatar: data.avatar || "/uploads/default-avatar.png" 
+          avatar: data.avatar || "/uploads/default-avatar.png",
+          createdAt: new Date().toISOString()
         };
         localStorage.setItem("currentUser", JSON.stringify(currentUser));
         initChatScreen();
@@ -284,7 +444,8 @@ document.addEventListener("DOMContentLoaded", () => {
         currentUser = { 
           id: data.id, 
           username: data.username, 
-          avatar: data.avatar || "/uploads/default-avatar.png" 
+          avatar: data.avatar || "/uploads/default-avatar.png",
+          createdAt: new Date().toISOString()
         };
         localStorage.setItem("currentUser", JSON.stringify(currentUser));
         initChatScreen();
@@ -461,7 +622,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chatName.textContent = otherUser.username;
     
     const isOnline = users.find(u => u.id === otherUser.id)?.online;
-    chatStatus.textContent = isOnline ? "online" : "offline";
+    chatStatus.textContent = isOnline ? "в сети" : "не в сети";
     chatStatus.style.color = isOnline ? "#48bb78" : "#9ca3af";
 
     renderMessages(chat.messages);
@@ -565,14 +726,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Profile
+  // Profile (updated to show settings instead of old profile modal)
   userProfile.onclick = () => {
-    profileModal.classList.remove("hidden");
-    profileName.value = currentUser.username;
-    profilePhoto.value = currentUser.avatar;
-    profileAvatar.src = currentUser.avatar;
+    showSettingsModal();
   };
 
+  // Keep old profile modal for backward compatibility
   closeProfile.onclick = () => {
     profileModal.classList.add("hidden");
   };
@@ -616,6 +775,11 @@ document.addEventListener("DOMContentLoaded", () => {
       socket.emit("message read", { chatId: currentChat.id, userId: currentUser.id });
     }
     
+    // Play notification sound if not in current chat
+    if (data.chatId !== currentChat?.id) {
+      playNotificationSound();
+    }
+    
     loadChats();
   });
 
@@ -640,7 +804,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentChat) {
       const otherUser = currentChat.otherUser;
       if (otherUser && otherUser.id === data.userId) {
-        chatStatus.textContent = data.online ? "online" : "offline";
+        chatStatus.textContent = data.online ? "в сети" : "не в сети";
         chatStatus.style.color = data.online ? "#48bb78" : "#9ca3af";
       }
     }
@@ -656,28 +820,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const addUserBtn = document.createElement("button");
   addUserBtn.className = "add-user-btn";
   addUserBtn.innerHTML = "+";
-  addUserBtn.style.position = "fixed";
-  addUserBtn.style.bottom = "20px";
-  addUserBtn.style.right = "20px";
-  addUserBtn.style.width = "56px";
-  addUserBtn.style.height = "56px";
-  addUserBtn.style.borderRadius = "50%";
-  addUserBtn.style.background = "#667eea";
-  addUserBtn.style.color = "white";
-  addUserBtn.style.border = "none";
-  addUserBtn.style.fontSize = "28px";
-  addUserBtn.style.cursor = "pointer";
-  addUserBtn.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
-  addUserBtn.style.zIndex = "1000";
-  addUserBtn.style.transition = "transform 0.2s, box-shadow 0.2s";
-  addUserBtn.onmouseover = () => {
-    addUserBtn.style.transform = "scale(1.1)";
-    addUserBtn.style.boxShadow = "0 6px 16px rgba(102, 126, 234, 0.5)";
-  };
-  addUserBtn.onmouseout = () => {
-    addUserBtn.style.transform = "scale(1)";
-    addUserBtn.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
-  };
   addUserBtn.onclick = showAddUserModal;
   document.body.appendChild(addUserBtn);
 
@@ -701,4 +843,13 @@ document.addEventListener("DOMContentLoaded", () => {
       e.target.classList.add('hidden');
     }
   });
+
+  // Listen for system theme changes
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (userSettings.theme === 'system') {
+        applyTheme('system');
+      }
+    });
+  }
 });

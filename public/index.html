@@ -898,6 +898,58 @@
       display: block;
       margin-bottom: 10px;
     }
+
+    /* Call Modal Styles */
+    #remoteVideo, #localVideo {
+      background: #1a1a1a;
+      transform: scaleX(-1);
+    }
+
+    #localVideo {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 80px;
+      height: 80px;
+      border-radius: 10px;
+      border: 2px solid white;
+      object-fit: cover;
+    }
+
+    #remoteVideo {
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+
+    .call-button {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      font-size: 24px;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .call-button:hover {
+      transform: scale(1.1);
+    }
+
+    .call-button.accept {
+      background: #48bb78;
+      color: white;
+    }
+
+    .call-button.reject {
+      background: #e53e3e;
+      color: white;
+    }
+
+    .call-button.mute {
+      background: #667eea;
+      color: white;
+    }
   </style>
 </head>
 <body>
@@ -972,8 +1024,9 @@
           </div>
         </div>
         <div class="chat-actions">
-          <button>📞</button>
-          <button>ℹ️</button>
+          <button id="audioCallBtn" title="Аудиозвонок">🎤</button>
+          <button id="videoCallBtn" title="Видеозвонок">📹</button>
+          <button id="callInfoBtn" title="Информация">ℹ️</button>
         </div>
       </div>
 
@@ -991,7 +1044,7 @@
     </div>
   </div>
 
-  <!-- Settings Modal (ЕДИНСТВЕННОЕ МОДАЛЬНОЕ ОКНО) -->
+  <!-- Settings Modal -->
   <div id="settingsModal" class="modal hidden">
     <div class="modal-content">
       <h3>Настройки профиля</h3>
@@ -1061,6 +1114,47 @@
       <div class="modal-buttons">
         <button class="save-btn" id="confirmAddUser">Добавить</button>
         <button class="cancel-btn" id="closeAddUser">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Call Modal -->
+  <div id="callModal" class="modal hidden">
+    <div class="modal-content" style="text-align: center; width: 350px;">
+      <div id="incomingCall" style="display: none;">
+        <h3>Входящий звонок</h3>
+        <div style="margin: 20px 0;">
+          <img src="" alt="" id="callerAvatar" class="preview-avatar" style="width: 100px; height: 100px;">
+          <h4 id="callerName"></h4>
+          <p id="callType"></p>
+        </div>
+        <div style="display: flex; gap: 20px; justify-content: center;">
+          <button class="cancel-btn" id="rejectCall" style="width: 60px; height: 60px; border-radius: 50%; font-size: 24px;">📞</button>
+          <button class="save-btn" id="acceptCall" style="width: 60px; height: 60px; border-radius: 50%; font-size: 24px; background: #48bb78;">📞</button>
+        </div>
+      </div>
+
+      <div id="outgoingCall" style="display: none;">
+        <h3>Исходящий звонок</h3>
+        <div style="margin: 20px 0;">
+          <img src="" alt="" id="calleeAvatar" class="preview-avatar" style="width: 100px; height: 100px;">
+          <h4 id="calleeName"></h4>
+          <p>Звоним...</p>
+        </div>
+        <button class="cancel-btn" id="cancelCall" style="width: 60px; height: 60px; border-radius: 50%; font-size: 24px; margin: 0 auto;">📞</button>
+      </div>
+
+      <div id="activeCall" style="display: none;">
+        <h3>Разговор</h3>
+        <div style="margin: 20px 0; position: relative;">
+          <video id="remoteVideo" autoplay playsinline style="width: 100%; border-radius: 10px; background: #1a1a1a;"></video>
+          <video id="localVideo" autoplay playsinline muted style="width: 80px; height: 80px; border-radius: 10px; position: absolute; bottom: 10px; right: 10px; border: 2px solid white;"></video>
+        </div>
+        <div style="display: flex; gap: 20px; justify-content: center;">
+          <button class="cancel-btn" id="endCall" style="width: 60px; height: 60px; border-radius: 50%; font-size: 24px;">📞</button>
+          <button class="save-btn" id="toggleMute" style="width: 60px; height: 60px; border-radius: 50%; font-size: 24px; background: #667eea;">🎤</button>
+          <button class="save-btn" id="toggleVideo" style="width: 60px; height: 60px; border-radius: 50%; font-size: 24px; background: #667eea;">📹</button>
+        </div>
       </div>
     </div>
   </div>

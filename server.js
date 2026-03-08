@@ -1,197 +1,294 @@
-const express = require("express")
-const fs = require("fs")
-const multer = require("multer")
-const { v4: uuidv4 } = require("uuid")
+const express = require("express");
+const fs = require("fs");
+const multer = require("multer");
+const { v4: uuidv4 } = require("uuid");
+const path = require("path");
 
-const app = express()
-const http = require("http").createServer(app)
-const io = require("socket.io")(http)
+const app = express();
+const http = require("http").createServer(app);
+const io = require("socket.io")(http, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
-app.use(express.json())
-app.use(express.static("public"))
-app.use("/uploads", express.static("uploads"))
+// Middleware
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-if(!fs.existsSync("uploads")){
-fs.mkdirSync("uploads")
+// Создаем папки, если их нет
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
 }
 
+// Настройка multer для загрузки файлов
 const storage = multer.diskStorage({
-destination:"uploads/",
-filename:(req,file,cb)=>{
-cb(null,Date.now()+"_"+file.originalname)
-}
-})
+  destination: "uploads/",
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "_" + file.originalname);
+  }
+});
+const upload = multer({ storage });
 
-const upload = multer({storage})
+// База данных
+let users = [];
+let chats = [];
+let onlineUsers = {};
 
-let users = []
-let chats = []
-let onlineUsers = {}
-
-if(fs.existsSync("data.json")){
-const data = JSON.parse(fs.readFileSync("data.json"))
-users = data.users || []
-chats = data.chats || []
-}
-
-function save(){
-fs.writeFileSync("data.json",JSON.stringify({users,chats},null,2))
-}
-
-/* REGISTER */
-
-app.post("/register",(req,res)=>{
-
-const {username,password} = req.body
-
-if(users.find(u=>u.username===username)){
-return res.json({error:"Пользователь существует"})
+// Загружаем данные из файла
+const DATA_FILE = "data.json";
+if (fs.existsSync(DATA_FILE)) {
+  try {
+    const data = JSON.parse(fs.readFileSync(DATA_FILE));
+    users = data.users || [];
+    chats = data.chats || [];
+  } catch (err) {
+    console.error("Error loading data:", err);
+  }
 }
 
-const user={
-id:uuidv4(),
-username,
-password
+function saveData() {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify({ users, chats }, null, 2));
+  } catch (err) {
+    console.error("Error saving data:", err);
+  }
 }
 
-users.push(user)
+// ============== API Routes ==============
 
-save()
+// Регистрация
+app.post("/register", (req, res) => {
+  const { username, password } = req.body;
 
-res.json({success:true})
+  if (!username || !password) {
+    return res.json({ error: "Username and password required" });
+  }
 
-})
+  if (users.find(u => u.username === username)) {
+    return res.json({ error: "Пользователь уже существует" });
+  }
 
-/* LOGIN */
+  const user = {
+    id: uuidv4(),
+    username,
+    password,
+    avatar: "/uploads/default-avatar.png",
+    createdAt: new Date().toISOString()
+  };
 
-app.post("/login",(req,res)=>{
+  users.push(user);
+  saveData();
 
-const {username,password} = req.body
+  res.json({ 
+    success: true, 
+    id: user.id,
+    username: user.username,
+    avatar: user.avatar
+  });
+});
 
-const user = users.find(u=>u.username===username && u.password===password)
+// Вход
+app.post("/login", (req, res) => {
+  const { username, password } = req.body;
 
-if(!user) return res.json({error:"Ошибка входа"})
+  const user = users.find(u => u.username === username && u.password === password);
 
-res.json({success:true,...user})
+  if (!user) {
+    return res.json({ error: "Неверный логин или пароль" });
+  }
 
-})
+  res.json({
+    success: true,
+    id: user.id,
+    username: user.username,
+    avatar: user.avatar
+  });
+});
 
-/* USERS */
+// Получить всех пользователей
+app.get("/users", (req, res) => {
+  res.json(
+    users.map(u => ({
+      id: u.id,
+      username: u.username,
+      avatar: u.avatar,
+      online: !!onlineUsers[u.id]
+    }))
+  );
+});
 
-app.get("/users",(req,res)=>{
+// Создать чат
+app.post("/createChat", (req, res) => {
+  const { members } = req.body;
 
-res.json(
-users.map(u=>({
-...u,
-online: !!onlineUsers[u.id]
-}))
-)
+  if (!members || members.length < 2) {
+    return res.json({ error: "Need at least 2 members" });
+  }
 
-})
+  // Проверяем, существует ли уже такой чат
+  let chat = chats.find(c => 
+    c.members.includes(members[0]) && 
+    c.members.includes(members[1]) &&
+    c.members.length === 2
+  );
 
-/* CREATE CHAT */
+  if (!chat) {
+    chat = {
+      id: uuidv4(),
+      members,
+      messages: [],
+      createdAt: new Date().toISOString()
+    };
+    chats.push(chat);
+    saveData();
+  }
 
-app.post("/createChat",(req,res)=>{
+  res.json({ success: true, chat });
+});
 
-const {members} = req.body
+// Отправить сообщение
+app.post("/sendMessage", upload.single("file"), (req, res) => {
+  const { chatId, userId, text } = req.body;
 
-let chat = chats.find(c=>
-c.members.includes(members[0]) &&
-c.members.includes(members[1])
-)
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat) {
+    return res.json({ error: "Чат не найден" });
+  }
 
-if(!chat){
+  const message = {
+    id: uuidv4(),
+    userId,
+    text: text || "",
+    file: req.file ? "/uploads/" + req.file.filename : null,
+    time: new Date().toLocaleTimeString(),
+    timestamp: Date.now(),
+    read: false,
+    readBy: []
+  };
 
-chat={
-id:uuidv4(),
-members,
-messages:[]
-}
+  chat.messages.push(message);
+  saveData();
 
-chats.push(chat)
+  // Отправляем уведомление всем в чате
+  io.to(chatId).emit("newMessage", { chatId, message });
 
-save()
+  res.json({ success: true, message });
+});
 
-}
+// Получить данные пользователя
+app.get("/data/:userId", (req, res) => {
+  const userId = req.params.userId;
+  
+  const userChats = chats.filter(c => c.members.includes(userId));
+  
+  // Добавляем информацию о других участниках
+  const enrichedChats = userChats.map(chat => ({
+    ...chat,
+    otherUser: users.find(u => u.id !== userId && chat.members.includes(u.id))
+  }));
 
-res.json({chat})
+  res.json({ chats: enrichedChats });
+});
 
-})
+// Обновить профиль
+app.post("/updateProfile", (req, res) => {
+  const { userId, username, avatar } = req.body;
 
-/* SEND MESSAGE */
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.json({ error: "User not found" });
+  }
 
-app.post("/sendMessage",upload.single("file"),(req,res)=>{
+  if (username) user.username = username;
+  if (avatar) user.avatar = avatar;
 
-const {chatId,userId,text} = req.body
+  saveData();
+  res.json({ success: true });
+});
 
-const chat = chats.find(c=>c.id===chatId)
+// ============== Socket.IO ==============
 
-if(!chat) return res.json({error:"чат не найден"})
+io.on("connection", (socket) => {
+  console.log("New connection:", socket.id);
 
-const message={
+  socket.on("login", (userId) => {
+    socket.userId = userId;
+    onlineUsers[userId] = true;
+    
+    // Присоединяемся к комнатам чатов пользователя
+    const userChats = chats.filter(c => c.members.includes(userId));
+    userChats.forEach(chat => {
+      socket.join(chat.id);
+    });
 
-id:uuidv4(),
+    io.emit("onlineUpdate", { userId, online: true });
+  });
 
-userId,
+  socket.on("chat message", (data) => {
+    const { chatId, userId, text } = data;
+    
+    const chat = chats.find(c => c.id === chatId);
+    if (!chat) return;
 
-text,
+    const message = {
+      id: uuidv4(),
+      userId,
+      text,
+      time: new Date().toLocaleTimeString(),
+      timestamp: Date.now(),
+      read: false,
+      readBy: [userId]
+    };
 
-file:req.file?"/uploads/"+req.file.filename:null,
+    chat.messages.push(message);
+    saveData();
 
-time:new Date().toLocaleTimeString(),
+    io.to(chatId).emit("chat message", { ...message, chatId });
+  });
 
-read:false
+  socket.on("message read", (data) => {
+    const { chatId, userId } = data;
+    
+    const chat = chats.find(c => c.id === chatId);
+    if (!chat) return;
 
-}
+    chat.messages.forEach(msg => {
+      if (msg.userId !== userId && !msg.read) {
+        msg.read = true;
+        msg.readBy = msg.readBy || [];
+        if (!msg.readBy.includes(userId)) {
+          msg.readBy.push(userId);
+        }
+      }
+    });
 
-chat.messages.push(message)
+    saveData();
+    io.to(chatId).emit("messages read", { chatId, userId });
+  });
 
-save()
+  socket.on("disconnect", () => {
+    if (socket.userId) {
+      delete onlineUsers[socket.userId];
+      io.emit("onlineUpdate", { userId: socket.userId, online: false });
+    }
+    console.log("Disconnected:", socket.id);
+  });
+});
 
-io.emit("newMessage",chatId)
+// Health check для Railway
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
-res.json({success:true})
+// Для SPA - отдаем index.html на все маршруты
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
-})
-
-/* GET DATA */
-
-app.get("/data/:userId",(req,res)=>{
-
-const userId=req.params.userId
-
-const userChats=chats.filter(c=>c.members.includes(userId))
-
-res.json({chats:userChats})
-
-})
-
-/* SOCKET */
-
-io.on("connection",socket=>{
-
-socket.on("login",userId=>{
-
-onlineUsers[userId]=true
-
-io.emit("onlineUpdate")
-
-})
-
-socket.on("disconnect",()=>{
-
-for(const id in onlineUsers){
-delete onlineUsers[id]
-}
-
-io.emit("onlineUpdate")
-
-})
-
-})
-
-http.listen(3000,()=>{
-
-console.log("Server started http://localhost:3000")
-
-})
+const PORT = process.env.PORT || 3000;
+http.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

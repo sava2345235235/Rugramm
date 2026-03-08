@@ -1,8 +1,16 @@
 const express = require("express");
 const fs = require("fs");
 const multer = require("multer");
-const { v4: uuidv4 } = require("uuid");
 const path = require("path");
+
+// Динамический импорт uuid
+let uuidv4;
+import('uuid').then(module => {
+  uuidv4 = module.v4;
+}).catch(err => {
+  console.error("Error importing uuid:", err);
+  process.exit(1);
+});
 
 const app = express();
 const http = require("http").createServer(app);

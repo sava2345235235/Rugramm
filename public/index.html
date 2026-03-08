@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Rugram</title>
   <style>
     * {
@@ -13,8 +13,8 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #0f172a;
-      color: white;
+      background: #fff;
+      color: #1a1a1a;
       height: 100vh;
       overflow: hidden;
     }
@@ -25,70 +25,73 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
 
     .login-card {
-      background: rgba(30, 41, 59, 0.8);
-      backdrop-filter: blur(10px);
+      background: white;
       padding: 40px;
       border-radius: 20px;
       width: 350px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
 
     .login-card h2 {
       margin-bottom: 20px;
       text-align: center;
-      color: #3b82f6;
+      color: #667eea;
+      font-size: 28px;
     }
 
     .login-card input {
       width: 100%;
-      padding: 12px;
+      padding: 15px;
       margin: 10px 0;
-      border: none;
-      border-radius: 10px;
-      background: #1e293b;
-      color: white;
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
       font-size: 16px;
-      border: 1px solid #334155;
+      transition: border-color 0.3s;
     }
 
     .login-card input:focus {
       outline: none;
-      border-color: #3b82f6;
+      border-color: #667eea;
     }
 
     .login-card button {
       width: 100%;
-      padding: 12px;
+      padding: 15px;
       margin: 10px 0;
       border: none;
-      border-radius: 10px;
-      background: #3b82f6;
-      color: white;
+      border-radius: 12px;
       font-size: 16px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: transform 0.2s, background 0.2s;
     }
 
-    .login-card button:hover {
-      background: #2563eb;
+    .login-card button:first-of-type {
+      background: #667eea;
+      color: white;
     }
 
-    .login-card button:last-child {
-      background: #22c55e;
+    .login-card button:first-of-type:hover {
+      background: #5a67d8;
+      transform: translateY(-2px);
     }
 
-    .login-card button:last-child:hover {
-      background: #16a34a;
+    .login-card button:last-of-type {
+      background: #48bb78;
+      color: white;
+    }
+
+    .login-card button:last-of-type:hover {
+      background: #38a169;
+      transform: translateY(-2px);
     }
 
     .error {
-      color: #ef4444;
+      color: #e53e3e;
       text-align: center;
       margin-top: 10px;
       font-size: 14px;
@@ -98,6 +101,7 @@
     #chatScreen {
       display: flex;
       height: 100vh;
+      background: #fff;
     }
 
     .hidden {
@@ -106,9 +110,9 @@
 
     /* Sidebar */
     .sidebar {
-      width: 320px;
-      background: #111827;
-      border-right: 1px solid #1f2937;
+      width: 350px;
+      background: #f8f9fa;
+      border-right: 1px solid #e9ecef;
       display: flex;
       flex-direction: column;
     }
@@ -118,13 +122,13 @@
       display: flex;
       align-items: center;
       gap: 15px;
-      border-bottom: 1px solid #1f2937;
+      border-bottom: 1px solid #e9ecef;
       cursor: pointer;
       transition: background 0.2s;
     }
 
     .user-profile:hover {
-      background: #1f2937;
+      background: #e9ecef;
     }
 
     .avatar {
@@ -132,72 +136,163 @@
       height: 50px;
       border-radius: 50%;
       object-fit: cover;
-      border: 2px solid #3b82f6;
+      border: 2px solid #667eea;
     }
 
     .user-info h4 {
       font-size: 16px;
-      margin-bottom: 5px;
+      font-weight: 600;
+      color: #1a1a1a;
     }
 
     .user-info p {
-      font-size: 12px;
+      font-size: 14px;
+      color: #667eea;
+    }
+
+    /* Search */
+    .search-container {
+      padding: 15px 20px;
+      border-bottom: 1px solid #e9ecef;
+    }
+
+    .search-box {
+      background: white;
+      border-radius: 25px;
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .search-box input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 14px;
+      background: transparent;
+    }
+
+    .search-box span {
       color: #9ca3af;
     }
 
-    .chats-header {
+    /* Pinned Chats */
+    .pinned-section, .recent-section {
       padding: 15px 20px;
+    }
+
+    .section-title {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid #1f2937;
+      margin-bottom: 15px;
+      color: #6b7280;
+      font-size: 14px;
+      font-weight: 600;
     }
 
-    .add-user-btn {
-      background: #3b82f6;
-      border: none;
-      color: white;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      font-size: 20px;
-      cursor: pointer;
+    .pinned-item {
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 12px;
+      cursor: pointer;
       transition: background 0.2s;
+      margin-bottom: 5px;
     }
 
-    .add-user-btn:hover {
-      background: #2563eb;
+    .pinned-item:hover {
+      background: #e9ecef;
     }
 
+    .pinned-avatar {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .pinned-info {
+      flex: 1;
+    }
+
+    .pinned-name {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+
+    .pinned-name h4 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .pinned-name .time {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .pinned-message {
+      font-size: 13px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .badge {
+      background: #667eea;
+      color: white;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 12px;
+      min-width: 20px;
+      text-align: center;
+    }
+
+    .online-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #48bb78;
+      display: inline-block;
+      margin-right: 5px;
+    }
+
+    /* Chats List */
     .chats-list {
       flex: 1;
       overflow-y: auto;
+      padding: 0 20px;
     }
 
     .chat-item {
-      padding: 15px 20px;
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 12px;
+      padding: 12px 10px;
+      border-radius: 12px;
       cursor: pointer;
       transition: background 0.2s;
-      border-bottom: 1px solid #1f2937;
+      margin-bottom: 5px;
     }
 
     .chat-item:hover {
-      background: #1f2937;
+      background: #e9ecef;
     }
 
     .chat-item.active {
-      background: #2d3748;
+      background: #e9ecef;
     }
 
     .chat-avatar {
-      width: 40px;
-      height: 40px;
+      width: 45px;
+      height: 45px;
       border-radius: 50%;
       object-fit: cover;
     }
@@ -206,83 +301,38 @@
       flex: 1;
     }
 
-    .chat-name {
-      font-weight: 600;
+    .chat-name-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 5px;
     }
 
-    .last-message {
-      font-size: 12px;
-      color: #9ca3af;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .chat-meta {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 5px;
+    .chat-name {
+      font-weight: 600;
+      font-size: 15px;
+      color: #1a1a1a;
     }
 
     .chat-time {
       font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .chat-last-message {
+      font-size: 13px;
       color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .unread-count {
-      background: #3b82f6;
+      background: #667eea;
       color: white;
       font-size: 11px;
       padding: 2px 6px;
-      border-radius: 10px;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-    }
-
-    .online {
-      background: #22c55e;
-    }
-
-    .offline {
-      background: #6b7280;
-    }
-
-    /* Logout button */
-    .logout-section {
-      padding: 20px;
-      border-top: 1px solid #1f2937;
-      margin-top: auto;
-    }
-
-    .logout-btn {
-      width: 100%;
-      padding: 12px;
-      background: #ef4444;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      transition: background 0.2s;
-    }
-
-    .logout-btn:hover {
-      background: #dc2626;
-    }
-
-    .logout-icon {
-      font-size: 18px;
+      border-radius: 12px;
     }
 
     /* Main Chat Area */
@@ -290,72 +340,121 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #0f172a;
+      background: #fff;
     }
 
     .chat-header {
-      padding: 20px;
-      background: #111827;
-      border-bottom: 1px solid #1f2937;
+      padding: 20px 30px;
+      background: #fff;
+      border-bottom: 1px solid #e9ecef;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .chat-header-info {
       display: flex;
       align-items: center;
       gap: 15px;
     }
 
     .chat-header-info h3 {
-      font-size: 16px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1a1a1a;
       margin-bottom: 5px;
     }
 
     .chat-header-info p {
-      font-size: 12px;
-      color: #9ca3af;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .chat-actions {
+      display: flex;
+      gap: 15px;
+    }
+
+    .chat-actions button {
+      background: none;
+      border: none;
+      font-size: 20px;
+      color: #6b7280;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+
+    .chat-actions button:hover {
+      background: #f3f4f6;
     }
 
     .messages-container {
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 30px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 15px;
+      background: #f8f9fa;
     }
 
     .message {
-      max-width: 60%;
-      padding: 12px;
-      border-radius: 15px;
-      position: relative;
-      word-wrap: break-word;
+      max-width: 45%;
+      display: flex;
+      flex-direction: column;
     }
 
     .message.self {
       align-self: flex-end;
-      background: #3b82f6;
-      border-bottom-right-radius: 5px;
     }
 
     .message.other {
       align-self: flex-start;
-      background: #1f2937;
+    }
+
+    .message-bubble {
+      padding: 12px 16px;
+      border-radius: 18px;
+      position: relative;
+      word-wrap: break-word;
+    }
+
+    .message.self .message-bubble {
+      background: #667eea;
+      color: white;
+      border-bottom-right-radius: 5px;
+    }
+
+    .message.other .message-bubble {
+      background: white;
+      color: #1a1a1a;
       border-bottom-left-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
     .message-sender {
       font-size: 12px;
       font-weight: 600;
       margin-bottom: 5px;
-      color: #9ca3af;
+      color: #6b7280;
     }
 
     .message-text {
-      margin-bottom: 5px;
+      font-size: 14px;
+      line-height: 1.4;
     }
 
     .message-time {
       font-size: 10px;
+      margin-top: 5px;
       text-align: right;
-      color: rgba(255, 255, 255, 0.6);
+      color: rgba(255,255,255,0.7);
+    }
+
+    .message.other .message-time {
+      color: #9ca3af;
     }
 
     .message-status {
@@ -364,27 +463,29 @@
     }
 
     .message-file {
-      margin-top: 5px;
+      margin-top: 8px;
     }
 
     .message-file a {
       color: white;
       text-decoration: none;
-      background: rgba(255, 255, 255, 0.2);
+      background: rgba(255,255,255,0.2);
       padding: 5px 10px;
-      border-radius: 5px;
+      border-radius: 15px;
       display: inline-block;
+      font-size: 12px;
     }
 
-    .message-file a:hover {
-      background: rgba(255, 255, 255, 0.3);
+    .message.other .message-file a {
+      background: #f3f4f6;
+      color: #1a1a1a;
     }
 
     /* Send Form */
     .send-form {
-      padding: 20px;
-      background: #111827;
-      border-top: 1px solid #1f2937;
+      padding: 20px 30px;
+      background: #fff;
+      border-top: 1px solid #e9ecef;
       display: flex;
       gap: 10px;
       align-items: center;
@@ -392,43 +493,40 @@
 
     .message-input {
       flex: 1;
-      padding: 12px;
-      border: none;
-      border-radius: 10px;
-      background: #1f2937;
-      color: white;
+      padding: 15px;
+      border: 1px solid #e0e0e0;
+      border-radius: 25px;
       font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
     }
 
     .message-input:focus {
-      outline: none;
-      border: 1px solid #3b82f6;
+      border-color: #667eea;
     }
 
     .emoji-btn, .file-btn, .send-btn {
       background: none;
       border: none;
-      color: #9ca3af;
       font-size: 20px;
       cursor: pointer;
-      padding: 8px;
+      padding: 10px;
       border-radius: 50%;
-      transition: all 0.2s;
+      transition: background 0.2s;
+      color: #6b7280;
     }
 
-    .emoji-btn:hover, .file-btn:hover, .send-btn:hover {
-      background: #1f2937;
-      color: #3b82f6;
+    .emoji-btn:hover, .file-btn:hover {
+      background: #f3f4f6;
     }
 
     .send-btn {
-      background: #3b82f6;
+      background: #667eea;
       color: white;
     }
 
     .send-btn:hover {
-      background: #2563eb;
-      color: white;
+      background: #5a67d8;
     }
 
     .file-input {
@@ -438,17 +536,17 @@
     /* Emoji Panel */
     .emoji-panel {
       position: absolute;
-      bottom: 80px;
-      right: 20px;
-      background: #1f2937;
-      border-radius: 10px;
-      padding: 10px;
+      bottom: 90px;
+      right: 30px;
+      background: white;
+      border-radius: 15px;
+      padding: 15px;
       display: none;
       flex-wrap: wrap;
-      gap: 5px;
-      width: 250px;
-      border: 1px solid #374151;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+      gap: 8px;
+      width: 280px;
+      border: 1px solid #e9ecef;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
     }
 
     .emoji-panel.show {
@@ -459,12 +557,12 @@
       font-size: 24px;
       cursor: pointer;
       padding: 5px;
-      border-radius: 5px;
+      border-radius: 8px;
       transition: background 0.2s;
     }
 
     .emoji:hover {
-      background: #374151;
+      background: #f3f4f6;
     }
 
     /* Modal */
@@ -474,7 +572,7 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.5);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -486,7 +584,7 @@
     }
 
     .modal-content {
-      background: #1f2937;
+      background: white;
       padding: 30px;
       border-radius: 20px;
       width: 350px;
@@ -494,23 +592,22 @@
 
     .modal-content h3 {
       margin-bottom: 20px;
-      color: #3b82f6;
+      color: #1a1a1a;
+      font-size: 20px;
     }
 
     .modal-content input {
       width: 100%;
       padding: 12px;
       margin: 10px 0;
-      border: none;
+      border: 2px solid #e0e0e0;
       border-radius: 10px;
-      background: #111827;
-      color: white;
-      border: 1px solid #374151;
+      font-size: 14px;
     }
 
     .modal-content input:focus {
       outline: none;
-      border-color: #3b82f6;
+      border-color: #667eea;
     }
 
     .modal-buttons {
@@ -529,12 +626,12 @@
     }
 
     .save-btn {
-      background: #3b82f6;
+      background: #667eea;
       color: white;
     }
 
     .cancel-btn {
-      background: #ef4444;
+      background: #e53e3e;
       color: white;
     }
 
@@ -544,16 +641,18 @@
       border-radius: 50%;
       margin: 10px auto;
       display: block;
-      border: 3px solid #3b82f6;
+      border: 3px solid #667eea;
     }
 
+    /* Mobile Styles */
     @media (max-width: 768px) {
       .sidebar {
-        width: 100%;
         position: absolute;
+        width: 100%;
+        height: 100%;
         z-index: 100;
         transform: translateX(-100%);
-        transition: transform 0.3s;
+        transition: transform 0.3s ease;
       }
 
       .sidebar.show {
@@ -563,6 +662,37 @@
       .chat-area {
         width: 100%;
       }
+
+      .message {
+        max-width: 75%;
+      }
+
+      .messages-container {
+        padding: 15px;
+      }
+
+      .send-form {
+        padding: 15px;
+      }
+
+      .emoji-panel {
+        right: 15px;
+        bottom: 80px;
+        width: 250px;
+      }
+
+      .mobile-menu-btn {
+        display: block !important;
+        background: none;
+        border: none;
+        font-size: 24px;
+        margin-right: 15px;
+        cursor: pointer;
+      }
+    }
+
+    .mobile-menu-btn {
+      display: none;
     }
   </style>
 </head>
@@ -591,29 +721,55 @@
         </div>
       </div>
 
-      <div class="chats-header">
-        <h3>Чаты</h3>
-        <button class="add-user-btn" id="addUserBtn">+</button>
+      <!-- Search -->
+      <div class="search-container">
+        <div class="search-box">
+          <span>🔍</span>
+          <input type="text" id="searchInput" placeholder="Search">
+        </div>
       </div>
 
-      <div class="chats-list" id="chatsContainer"></div>
+      <!-- Pinned Chats -->
+      <div class="pinned-section">
+        <div class="section-title">
+          <span>Pinned</span>
+          <span>📌</span>
+        </div>
+        <div id="pinnedContainer"></div>
+      </div>
+
+      <!-- Recent Chats -->
+      <div class="recent-section">
+        <div class="section-title">
+          <span>Recent</span>
+        </div>
+        <div class="chats-list" id="chatsContainer"></div>
+      </div>
 
       <!-- Logout button -->
-      <div class="logout-section">
-        <button class="logout-btn" id="logoutBtn">
-          <span class="logout-icon">🚪</span>
-          Выйти
-        </button>
+      <div class="user-profile" style="border-top: 1px solid #e9ecef; margin-top: auto;" id="logoutBtn">
+        <div class="avatar" style="background: #e53e3e; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">🚪</div>
+        <div class="user-info">
+          <h4>Выйти</h4>
+          <p>Выход из аккаунта</p>
+        </div>
       </div>
     </div>
 
     <!-- Main Chat Area -->
     <div class="chat-area">
-      <div class="chat-header" id="chatHeader">
-        <img src="" alt="" class="avatar" id="chatAvatar" style="display: none;">
+      <div class="chat-header">
         <div class="chat-header-info">
-          <h3 id="chatName">Выберите чат</h3>
-          <p id="chatStatus"></p>
+          <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
+          <img src="" alt="" class="avatar" id="chatAvatar" style="display: none;">
+          <div>
+            <h3 id="chatName">Выберите чат</h3>
+            <p id="chatStatus"></p>
+          </div>
+        </div>
+        <div class="chat-actions">
+          <button>📞</button>
+          <button>ℹ️</button>
         </div>
       </div>
 

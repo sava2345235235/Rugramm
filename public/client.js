@@ -1,152 +1,203 @@
-// Add User functionality
-function showAddUserModal() {
-  console.log("Opening add user modal");
-  addUserModal.classList.remove("hidden");
-  addUsernameInput.value = "";
-  userSearchResults.innerHTML = "";
-  addUsernameInput.focus();
-}
+document.addEventListener("DOMContentLoaded", () => {
+  const socket = io({
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+  });
 
-// Search users as you type
-let searchUserTimeout;
-addUsernameInput.addEventListener("input", () => {
-  clearTimeout(searchUserTimeout);
-  const query = addUsernameInput.value.trim();
-  
-  console.log("Search query:", query); // для отладки
-  
-  if (query.length < 1) {
-    userSearchResults.innerHTML = "";
-    return;
+  socket.on('connect', () => {
+    console.log('✅ Socket connected');
+    if (currentUser) {
+      socket.emit('login', currentUser.id);
+    }
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('❌ Socket connection error:', error);
+  });
+
+  let currentUser = null;
+  let currentChat = null;
+  let users = [];
+  let chats = [];
+  let userSettings = {};
+
+  // DOM Elements
+  const loginScreen = document.getElementById("loginScreen");
+  const chatScreen = document.getElementById("chatScreen");
+  const usernameInput = document.getElementById("usernameInput");
+  const passwordInput = document.getElementById("passwordInput");
+  const registerBtn = document.getElementById("registerBtn");
+  const loginBtn = document.getElementById("loginBtn");
+  const errorP = document.getElementById("error");
+
+  // Check saved user
+  const savedUser = localStorage.getItem("currentUser");
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      console.log('✅ Found saved user:', currentUser);
+      initChatScreen();
+    } catch (err) {
+      console.error('Error parsing saved user:', err);
+      localStorage.removeItem("currentUser");
+    }
   }
 
-  userSearchResults.innerHTML = '<div class="spinner"></div>';
+  // Register
+  async function register() {
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
 
-  searchUserTimeout = setTimeout(() => {
-    searchUsers(query);
-  }, 300);
-});
-
-async function searchUsers(query) {
-  const searchTerm = query.startsWith('@') ? query.substring(1) : query;
-  
-  try {
-    const res = await fetch(`/search/users?q=${encodeURIComponent(searchTerm)}`);
-    const filteredUsers = await res.json();
-    
-    console.log("Found users:", filteredUsers); // для отладки
-
-    if (filteredUsers.length === 0) {
-      userSearchResults.innerHTML = '<div class="empty-state"><span>😕</span><br>Пользователи не найдены</div>';
+    if (!username || !password) {
+      errorP.innerText = "Заполните все поля";
       return;
     }
 
-    userSearchResults.innerHTML = filteredUsers.map(user => `
-      <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
-        <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
-        <div class="user-info">
-          <div class="user-name">${user.username}</div>
-          <div class="user-status">
-            <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
-            <span style="color: ${user.online ? '#48bb78' : '#9ca3af'};">
-              ${user.online ? 'в сети' : 'не в сети'}
-            </span>
-          </div>
-        </div>
-      </div>
-    `).join('');
-
-    document.querySelectorAll('.user-search-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const username = item.dataset.username;
-        addUsernameInput.value = '@' + username;
-        userSearchResults.innerHTML = '';
+    try {
+      console.log('📝 Registering:', username);
+      const res = await fetch("/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
       });
-    });
-  } catch (err) {
-    console.error("Error searching users:", err);
-    userSearchResults.innerHTML = '<div class="empty-state"><span>❌</span><br>Ошибка поиска</div>';
-  }
-}
+      
+      const data = await res.json();
+      console.log('📝 Register response:', data);
 
-confirmAddUser.onclick = async () => {
-  let username = addUsernameInput.value.trim();
-  
-  if (!username) {
-    alert("Введите username");
-    return;
-  }
-
-  if (username.startsWith('@')) {
-    username = username.substring(1);
-  }
-
-  console.log("Adding user:", username); // для отладки
-
-  const user = users.find(u => u.username === username);
-  if (!user) {
-    alert("Пользователь не найден");
-    return;
-  }
-
-  if (user.id === currentUser.id) {
-    alert("Нельзя добавить самого себя");
-    return;
-  }
-
-  // Проверяем, существует ли уже чат
-  const existingChat = chats.find(chat => 
-    chat.members.includes(currentUser.id) && 
-    chat.members.includes(user.id)
-  );
-
-  if (existingChat) {
-    addUserModal.classList.add("hidden");
-    openChat(existingChat);
-    return;
-  }
-
-  try {
-    const res = await fetch("/createChat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ members: [currentUser.id, user.id] })
-    });
-
-    const data = await res.json();
-    console.log("Chat created:", data); // для отладки
-
-    if (data.success) {
-      addUserModal.classList.add("hidden");
-      await loadChats();
-      openChat(data.chat);
+      if (data.success) {
+        currentUser = { 
+          id: data.id, 
+          username: data.username, 
+          avatar: data.avatar || "/uploads/default-avatar.png"
+        };
+        localStorage.setItem("currentUser", JSON.stringify(currentUser));
+        console.log('✅ Registered and saved user:', currentUser);
+        initChatScreen();
+        if (socket.connected) {
+          socket.emit("login", currentUser.id);
+        }
+      } else {
+        errorP.innerText = data.error || "Ошибка регистрации";
+      }
+    } catch (err) {
+      console.error('❌ Register error:', err);
+      errorP.innerText = "Ошибка соединения с сервером";
     }
-  } catch (err) {
-    console.error("Error creating chat:", err);
-    alert("Ошибка при создании чата");
   }
-};
 
-closeAddUser.onclick = () => {
-  addUserModal.classList.add("hidden");
-};
+  // Login
+  async function login() {
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value.trim();
 
-// Инициализация кнопки добавления
-function initAddUserButton() {
-  const addUserBtn = document.getElementById("addUserBtn");
-  if (addUserBtn) {
-    console.log("Add user button found"); // для отладки
-    addUserBtn.onclick = showAddUserModal;
-  } else {
-    console.log("Add user button not found, creating new one"); // для отладки
-    const newBtn = document.createElement("button");
-    newBtn.className = "add-user-btn";
-    newBtn.id = "addUserBtn";
-    newBtn.innerHTML = "+";
-    newBtn.onclick = showAddUserModal;
-    document.body.appendChild(newBtn);
+    if (!username || !password) {
+      errorP.innerText = "Заполните все поля";
+      return;
+    }
+
+    try {
+      console.log('🔑 Logging in:', username);
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      
+      const data = await res.json();
+      console.log('🔑 Login response:', data);
+
+      if (data.success) {
+        currentUser = { 
+          id: data.id, 
+          username: data.username, 
+          avatar: data.avatar || "/uploads/default-avatar.png"
+        };
+        localStorage.setItem("currentUser", JSON.stringify(currentUser));
+        console.log('✅ Login successful:', currentUser);
+        initChatScreen();
+        if (socket.connected) {
+          socket.emit("login", currentUser.id);
+        }
+      } else {
+        errorP.innerText = data.error || "Неверный логин или пароль";
+      }
+    } catch (err) {
+      console.error('❌ Login error:', err);
+      errorP.innerText = "Ошибка соединения с сервером";
+    }
   }
-}
 
-// Вызовите инициализацию после загрузки страницы
-initAddUserButton();
+  // Init chat screen
+  async function initChatScreen() {
+    console.log('🎯 Initializing chat screen for:', currentUser);
+    loginScreen.classList.add("hidden");
+    chatScreen.classList.remove("hidden");
+    
+    const userName = document.getElementById("userName");
+    const userAvatar = document.getElementById("userAvatar");
+    
+    if (userName) userName.textContent = currentUser.username;
+    if (userAvatar) userAvatar.src = currentUser.avatar;
+
+    await loadUsers();
+    await loadChats();
+  }
+
+  // Load users
+  async function loadUsers() {
+    try {
+      const res = await fetch("/users");
+      users = await res.json();
+      console.log('👥 Users loaded:', users.length);
+    } catch (err) {
+      console.error("Error loading users:", err);
+    }
+  }
+
+  // Load chats
+  async function loadChats() {
+    try {
+      const res = await fetch(`/data/${currentUser.id}`);
+      const data = await res.json();
+      chats = data.chats || [];
+      console.log('💬 Chats loaded:', chats.length);
+      renderChats(chats);
+    } catch (err) {
+      console.error("Error loading chats:", err);
+    }
+  }
+
+  // Minimal render function
+  function renderChats(chatsToRender) {
+    const chatsContainer = document.getElementById("chatsContainer");
+    if (!chatsContainer) return;
+    
+    chatsContainer.innerHTML = "";
+
+    if (chatsToRender.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.padding = "20px";
+      empty.style.textAlign = "center";
+      empty.style.color = "#6b7280";
+      empty.textContent = "Нет чатов";
+      chatsContainer.appendChild(empty);
+      return;
+    }
+
+    chatsToRender.forEach(chat => {
+      const otherUser = chat.otherUser || { username: "Пользователь" };
+      const div = document.createElement("div");
+      div.className = "chat-item";
+      div.innerHTML = `<div class="chat-name">${otherUser.username}</div>`;
+      chatsContainer.appendChild(div);
+    });
+  }
+
+  // Event listeners
+  registerBtn.onclick = register;
+  loginBtn.onclick = login;
+
+  console.log('🚀 App initialized');
+});

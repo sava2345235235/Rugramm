@@ -32,6 +32,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const logoutBtn = document.getElementById("logoutBtn");
   const searchInput = document.getElementById("searchInput");
 
+  // Add User Modal elements
+  const addUserModal = document.getElementById("addUserModal");
+  const addUsernameInput = document.getElementById("addUsernameInput");
+  const userSearchResults = document.getElementById("userSearchResults");
+  const confirmAddUser = document.getElementById("confirmAddUser");
+  const closeAddUser = document.getElementById("closeAddUser");
+
   // Profile modal
   const profileModal = document.getElementById("profileModal");
   const closeProfile = document.getElementById("closeProfile");
@@ -103,6 +110,122 @@ document.addEventListener("DOMContentLoaded", () => {
     );
     renderChats(filtered);
   }
+
+  // Add User functionality
+  function showAddUserModal() {
+    addUserModal.classList.remove("hidden");
+    addUsernameInput.value = "";
+    userSearchResults.innerHTML = "";
+    addUsernameInput.focus();
+  }
+
+  // Search users as you type
+  let searchUserTimeout;
+  addUsernameInput.addEventListener("input", () => {
+    clearTimeout(searchUserTimeout);
+    const query = addUsernameInput.value.trim();
+    
+    if (query.length < 1) {
+      userSearchResults.innerHTML = "";
+      return;
+    }
+
+    searchUserTimeout = setTimeout(() => {
+      searchUsers(query);
+    }, 300);
+  });
+
+  function searchUsers(query) {
+    // Remove @ if present
+    const searchTerm = query.startsWith('@') ? query.substring(1) : query;
+    
+    const filteredUsers = users.filter(user => 
+      user.id !== currentUser.id && 
+      user.username.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (filteredUsers.length === 0) {
+      userSearchResults.innerHTML = '<div style="padding: 10px; text-align: center; color: #9ca3af;">Пользователи не найдены</div>';
+      return;
+    }
+
+    userSearchResults.innerHTML = filteredUsers.map(user => `
+      <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}" style="
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 8px;
+        background: #f3f4f6;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: background 0.2s;
+      ">
+        <img src="${user.avatar || '/uploads/default-avatar.png'}" style="width: 30px; height: 30px; border-radius: 50%; object-fit: cover;">
+        <span style="flex: 1;">${user.username}</span>
+        <span style="color: ${user.online ? '#48bb78' : '#9ca3af'}; font-size: 12px;">${user.online ? '● online' : '○ offline'}</span>
+      </div>
+    `).join('');
+
+    // Add click handlers
+    document.querySelectorAll('.user-search-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const userId = item.dataset.userId;
+        const username = item.dataset.username;
+        addUsernameInput.value = '@' + username;
+        userSearchResults.innerHTML = '';
+      });
+    });
+  }
+
+  // Add selected user to chat
+  confirmAddUser.onclick = async () => {
+    let username = addUsernameInput.value.trim();
+    
+    if (!username) {
+      alert("Введите username");
+      return;
+    }
+
+    // Remove @ if present
+    if (username.startsWith('@')) {
+      username = username.substring(1);
+    }
+
+    const user = users.find(u => u.username === username);
+    if (!user) {
+      alert("Пользователь не найден");
+      return;
+    }
+
+    if (user.id === currentUser.id) {
+      alert("Нельзя добавить самого себя");
+      return;
+    }
+
+    try {
+      const res = await fetch("/createChat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ members: [currentUser.id, user.id] })
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        addUserModal.classList.add("hidden");
+        await loadChats();
+        openChat(data.chat);
+      }
+    } catch (err) {
+      console.error("Error creating chat:", err);
+      alert("Ошибка при создании чата");
+    }
+  };
+
+  closeAddUser.onclick = () => {
+    addUserModal.classList.add("hidden");
+  };
 
   // Register
   async function register() {
@@ -246,7 +369,7 @@ document.addEventListener("DOMContentLoaded", () => {
       empty.style.padding = "20px";
       empty.style.textAlign = "center";
       empty.style.color = "#6b7280";
-      empty.textContent = "Нет чатов. Нажмите + чтобы добавить";
+      empty.textContent = "Нет чатов. Нажмите кнопку + чтобы добавить";
       chatsContainer.appendChild(empty);
       return;
     }
@@ -442,40 +565,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Add user to chat (simplified - just create chat with username)
-  async function addUser() {
-    const username = prompt("Введите username пользователя");
-    if (!username) return;
-
-    const user = users.find(u => u.username === username);
-    if (!user) {
-      alert("Пользователь не найден");
-      return;
-    }
-
-    if (user.id === currentUser.id) {
-      alert("Нельзя добавить самого себя");
-      return;
-    }
-
-    try {
-      const res = await fetch("/createChat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ members: [currentUser.id, user.id] })
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        await loadChats();
-        openChat(data.chat);
-      }
-    } catch (err) {
-      console.error("Error creating chat:", err);
-    }
-  }
-
   // Profile
   userProfile.onclick = () => {
     profileModal.classList.remove("hidden");
@@ -563,23 +652,33 @@ document.addEventListener("DOMContentLoaded", () => {
   logoutBtn.onclick = logout;
   sendForm.onsubmit = sendMessage;
 
-  // Add user button (you can add a button in the UI for this)
+  // Add user button
   const addUserBtn = document.createElement("button");
   addUserBtn.className = "add-user-btn";
   addUserBtn.innerHTML = "+";
   addUserBtn.style.position = "fixed";
   addUserBtn.style.bottom = "20px";
   addUserBtn.style.right = "20px";
-  addUserBtn.style.width = "50px";
-  addUserBtn.style.height = "50px";
+  addUserBtn.style.width = "56px";
+  addUserBtn.style.height = "56px";
   addUserBtn.style.borderRadius = "50%";
   addUserBtn.style.background = "#667eea";
   addUserBtn.style.color = "white";
   addUserBtn.style.border = "none";
-  addUserBtn.style.fontSize = "24px";
+  addUserBtn.style.fontSize = "28px";
   addUserBtn.style.cursor = "pointer";
-  addUserBtn.style.boxShadow = "0 4px 6px rgba(0,0,0,0.1)";
-  addUserBtn.onclick = addUser;
+  addUserBtn.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+  addUserBtn.style.zIndex = "1000";
+  addUserBtn.style.transition = "transform 0.2s, box-shadow 0.2s";
+  addUserBtn.onmouseover = () => {
+    addUserBtn.style.transform = "scale(1.1)";
+    addUserBtn.style.boxShadow = "0 6px 16px rgba(102, 126, 234, 0.5)";
+  };
+  addUserBtn.onmouseout = () => {
+    addUserBtn.style.transform = "scale(1)";
+    addUserBtn.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+  };
+  addUserBtn.onclick = showAddUserModal;
   document.body.appendChild(addUserBtn);
 
   // Click outside emoji panel
@@ -593,6 +692,13 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", () => {
     if (window.innerWidth > 768) {
       sidebar.classList.remove("show");
+    }
+  });
+
+  // Close modals when clicking outside
+  window.addEventListener("click", (e) => {
+    if (e.target.classList.contains('modal')) {
+      e.target.classList.add('hidden');
     }
   });
 });

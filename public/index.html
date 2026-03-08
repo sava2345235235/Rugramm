@@ -253,6 +253,38 @@
       background: #6b7280;
     }
 
+    /* Logout button */
+    .logout-section {
+      padding: 20px;
+      border-top: 1px solid #1f2937;
+      margin-top: auto;
+    }
+
+    .logout-btn {
+      width: 100%;
+      padding: 12px;
+      background: #ef4444;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background 0.2s;
+    }
+
+    .logout-btn:hover {
+      background: #dc2626;
+    }
+
+    .logout-icon {
+      font-size: 18px;
+    }
+
     /* Main Chat Area */
     .chat-area {
       flex: 1;
@@ -565,6 +597,14 @@
       </div>
 
       <div class="chats-list" id="chatsContainer"></div>
+
+      <!-- Logout button -->
+      <div class="logout-section">
+        <button class="logout-btn" id="logoutBtn">
+          <span class="logout-icon">🚪</span>
+          Выйти
+        </button>
+      </div>
     </div>
 
     <!-- Main Chat Area -->

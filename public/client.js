@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const registerBtn = document.getElementById("registerBtn");
   const loginBtn = document.getElementById("loginBtn");
   const addUserBtn = document.getElementById("addUserBtn");
-  const sendBtn = document.getElementById("sendBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
   const sendForm = document.getElementById("sendForm");
   const messageInput = document.getElementById("messageInput");
   const messagesDiv = document.getElementById("messages");
@@ -134,6 +134,42 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       errorP.innerText = "Ошибка соединения";
     }
+  }
+
+  // Logout function
+  function logout() {
+    // Очищаем данные пользователя из localStorage
+    localStorage.removeItem("currentUser");
+    
+    // Очищаем текущие данные
+    currentUser = null;
+    currentChat = null;
+    users = [];
+    chats = [];
+    
+    // Отключаем сокет
+    socket.disconnect();
+    
+    // Переключаем экраны
+    chatScreen.classList.add("hidden");
+    loginScreen.classList.remove("hidden");
+    
+    // Очищаем поля ввода
+    usernameInput.value = "";
+    passwordInput.value = "";
+    errorP.innerText = "";
+    
+    // Очищаем сообщения
+    messagesDiv.innerHTML = "";
+    
+    // Очищаем список чатов
+    chatsContainer.innerHTML = "";
+    
+    // Сбрасываем заголовок чата
+    chatName.textContent = "Выберите чат";
+    chatStatus.textContent = "";
+    
+    console.log("Пользователь вышел из аккаунта");
   }
 
   // Init chat screen
@@ -470,6 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Event listeners
   registerBtn.onclick = register;
   loginBtn.onclick = login;
+  logoutBtn.onclick = logout;
   addUserBtn.onclick = addUser;
   sendForm.onsubmit = sendMessage;
 

@@ -376,23 +376,44 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // ============== LOGOUT - ИСПРАВЛЕНО ==============
   function logout() {
+    console.log("Logging out...");
+    
+    // Очищаем данные пользователя из localStorage
     localStorage.removeItem("currentUser");
+    localStorage.removeItem("userSettings");
+    
+    // Очищаем текущие данные
     currentUser = null;
     currentChat = null;
     users = [];
     chats = [];
-    socket.disconnect();
+    
+    // Отключаем сокет
+    if (socket) {
+      socket.disconnect();
+    }
+    
+    // Переключаем экраны
     chatScreen.classList.add("hidden");
     loginScreen.classList.remove("hidden");
+    
+    // Очищаем поля ввода
     usernameInput.value = "";
     passwordInput.value = "";
     errorP.innerText = "";
+    
+    // Очищаем сообщения и чаты
     messagesDiv.innerHTML = "";
     chatsContainer.innerHTML = "";
-    pinnedContainer.innerHTML = "";
+    if (pinnedContainer) pinnedContainer.innerHTML = "";
+    
+    // Сбрасываем заголовок чата
     chatName.textContent = "Выберите чат";
     chatStatus.textContent = "";
+    
+    console.log("User logged out successfully");
   }
 
   // ============== CHAT FUNCTIONS ==============
@@ -597,7 +618,7 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.appendChild(messageDiv);
   }
 
-  // ============== SEND MESSAGE - ИСПРАВЛЕНО ==============
+  // ============== SEND MESSAGE ==============
 
   async function sendMessage(e) {
     e.preventDefault();
@@ -828,7 +849,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   registerBtn.onclick = register;
   loginBtn.onclick = login;
-  if (logoutBtn) logoutBtn.onclick = logout;
+  if (logoutBtn) {
+    logoutBtn.onclick = logout;
+    console.log("Logout button handler attached");
+  }
 
   // Close modals when clicking outside
   window.addEventListener("click", (e) => {

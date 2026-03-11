@@ -187,6 +187,38 @@
             color: #6b7280;
         }
 
+        /* Add Chat Button */
+        .add-chat-container {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .add-chat-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #000000, #1E3A8A, #3B82F6);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .add-chat-btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.5);
+        }
+
+        .add-chat-btn span {
+            font-size: 20px;
+        }
+
         /* Chats List */
         .chats-list {
             flex: 1;
@@ -568,21 +600,281 @@
             display: none;
         }
 
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal.hidden {
+            display: none !important;
+        }
+
+        .modal-content {
+            background: #111827;
+            padding: 30px;
+            border-radius: 20px;
+            width: 400px;
+            max-width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .modal-content h3 {
+            margin-bottom: 20px;
+            color: white;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        /* Settings Modal */
+        .settings-field {
+            margin-bottom: 20px;
+        }
+
+        .settings-field label {
+            display: block;
+            margin-bottom: 8px;
+            color: #9ca3af;
+            font-size: 14px;
+        }
+
+        .settings-field input,
+        .settings-field select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #1f2937;
+            border-radius: 10px;
+            background: #111827;
+            color: white;
+            font-size: 14px;
+        }
+
+        .settings-field input:focus,
+        .settings-field select:focus {
+            outline: none;
+            border-color: #3B82F6;
+        }
+
+        .settings-display {
+            padding: 12px;
+            background: #1f2937;
+            border-radius: 10px;
+            color: #9ca3af;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .settings-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: #1f2937;
+            border-radius: 10px;
+        }
+
+        .settings-actions {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .settings-actions button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .save-btn {
+            background: #3B82F6;
+            color: white;
+        }
+
+        .cancel-btn {
+            background: #6b7280;
+            color: white;
+        }
+
+        .logout-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #1f2937;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 14px;
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: background 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #dc2626;
+        }
+
+        .preview-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #3B82F6;
+        }
+
+        .settings-label {
+            background: #3B82F6;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        /* Add User Modal */
+        .user-search-item {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 10px;
+            background: #1f2937;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .user-search-item:hover {
+            background: #2d3748;
+            border-color: #3B82F6;
+        }
+
+        .user-search-item img {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            object-fit: cover;
+        }
+
+        .user-search-item .user-info {
+            flex: 1;
+        }
+
+        .user-search-item .user-name {
+            font-weight: 600;
+            color: white;
+            margin-bottom: 4px;
+        }
+
+        .user-search-item .user-status {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.online {
+            background: #22c55e;
+        }
+
+        .status-dot.offline {
+            background: #6b7280;
+        }
+
         /* Scrollbar */
         .messages-container::-webkit-scrollbar,
-        .chats-list::-webkit-scrollbar {
+        .chats-list::-webkit-scrollbar,
+        .modal-content::-webkit-scrollbar {
             width: 6px;
         }
 
         .messages-container::-webkit-scrollbar-track,
-        .chats-list::-webkit-scrollbar-track {
+        .chats-list::-webkit-scrollbar-track,
+        .modal-content::-webkit-scrollbar-track {
             background: #1f2937;
         }
 
         .messages-container::-webkit-scrollbar-thumb,
-        .chats-list::-webkit-scrollbar-thumb {
+        .chats-list::-webkit-scrollbar-thumb,
+        .modal-content::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, #000000, #1E3A8A, #3B82F6);
             border-radius: 3px;
+        }
+
+        /* Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background: linear-gradient(135deg, #000000, #1E3A8A, #3B82F6);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
 
         /* Mobile */
@@ -645,7 +937,7 @@
                 <img src="/uploads/default-avatar.png" alt="Avatar" class="avatar" id="userAvatar">
                 <div class="user-info">
                     <h4 id="userName"></h4>
-                    <p>Online</p>
+                    <p>Нажмите для настроек</p>
                 </div>
             </div>
 
@@ -657,17 +949,15 @@
                 </div>
             </div>
 
+            <!-- Add Chat Button -->
+            <div class="add-chat-container">
+                <button class="add-chat-btn" id="addUserBtn">
+                    <span>+</span> Новый чат
+                </button>
+            </div>
+
             <!-- Chats List -->
             <div class="chats-list" id="chatsContainer"></div>
-
-            <!-- Logout button -->
-            <div class="user-profile" style="border-top: 1px solid rgba(255,255,255,0.05); margin-top: auto;" id="logoutBtn">
-                <div class="avatar" style="background: #ef4444; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px;">🚪</div>
-                <div class="user-info">
-                    <h4>Выйти</h4>
-                    <p>Выход из аккаунта</p>
-                </div>
-            </div>
         </div>
 
         <!-- Main Chat Area -->
@@ -712,6 +1002,85 @@
                         </svg>
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Настройки профиля</h3>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="" alt="Avatar" class="preview-avatar" id="settingsAvatar">
+                <div style="margin-top: 10px;">
+                    <label for="avatarUpload" class="settings-label">📷 Сменить фото</label>
+                    <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+                </div>
+            </div>
+
+            <div class="settings-field">
+                <label>👤 Имя пользователя</label>
+                <input type="text" id="settingsUsername" placeholder="Ваше имя">
+            </div>
+
+            <div class="settings-field">
+                <label>🆔 ID пользователя</label>
+                <div class="settings-display" id="settingsUserId"></div>
+            </div>
+
+            <div class="settings-field">
+                <label>📅 Дата регистрации</label>
+                <div class="settings-display" id="settingsCreatedAt"></div>
+            </div>
+
+            <div class="settings-field">
+                <label>🔔 Уведомления</label>
+                <div class="settings-switch">
+                    <span>Звук уведомлений</span>
+                    <label class="switch">
+                        <input type="checkbox" id="notificationSound" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="settings-field">
+                <label>🎨 Тема</label>
+                <select id="themeSelect">
+                    <option value="light">Светлая</option>
+                    <option value="dark">Темная</option>
+                    <option value="system">Как в системе</option>
+                </select>
+            </div>
+
+            <div class="settings-actions">
+                <button class="save-btn" id="saveSettings">Сохранить</button>
+                <button class="cancel-btn" id="closeSettings">Отмена</button>
+            </div>
+
+            <!-- Кнопка выхода в настройках -->
+            <div class="logout-section">
+                <button class="logout-btn" id="logoutBtn">
+                    <span>🚪</span>
+                    Выйти из аккаунта
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Добавить пользователя</h3>
+            <div style="text-align: center; margin-bottom: 15px;">
+                <span style="font-size: 48px;">👤</span>
+            </div>
+            <input type="text" id="addUsernameInput" placeholder="@username">
+            <div id="userSearchResults" style="max-height: 250px; overflow-y: auto; margin: 15px 0;"></div>
+            <div class="settings-actions">
+                <button class="save-btn" id="confirmAddUser">Добавить</button>
+                <button class="cancel-btn" id="closeAddUser">Отмена</button>
             </div>
         </div>
     </div>

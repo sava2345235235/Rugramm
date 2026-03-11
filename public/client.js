@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatName = document.getElementById("chatName");
   const chatStatus = document.getElementById("chatStatus");
   const fileInput = document.getElementById("fileInput");
-  const fileBtn = document.getElementById("fileBtn") || document.getElementById("attachBtn");
+  const fileBtn = document.getElementById("attachBtn") || document.getElementById("fileBtn");
   const sendBtn = document.getElementById("sendBtn");
   const mobileMenuBtn = document.getElementById("mobileMenuBtn");
   const sidebar = document.getElementById("sidebar");
@@ -253,7 +253,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       if (userSearchResults) {
-        userSearchResults.innerHTML = '<div class="spinner" style="text-align:center; padding:20px;">🔍 Поиск...</div>';
+        userSearchResults.innerHTML = '<div style="text-align:center; padding:20px;">🔍 Поиск...</div>';
       }
 
       searchUserTimeout = setTimeout(() => {
@@ -615,7 +615,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (msg.file) {
       const isImage = msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i);
       if (isImage) {
-        content += `<div class="message-file"><img src="${msg.file}" alt="image"></div>`;
+        content += `<div class="message-file"><img src="${msg.file}" alt="image" style="max-width: 100%; max-height: 200px; border-radius: 10px;"></div>`;
       } else {
         const fileName = msg.file.split('_').pop() || 'файл';
         content += `<div class="message-file"><a href="${msg.file}" target="_blank">📎 ${fileName}</a></div>`;
@@ -653,6 +653,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (text) formData.append("text", text);
     if (file) formData.append("file", file);
 
+    // Показываем индикатор загрузки на мобильных
+    if (window.innerWidth <= 768) {
+      sendBtn.classList.add('loading');
+    }
+
     try {
       const res = await fetch("/sendMessage", {
         method: "POST",
@@ -667,6 +672,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       console.error("Error sending message:", err);
+      alert("Ошибка при отправке");
+    } finally {
+      sendBtn.classList.remove('loading');
     }
   }
 
@@ -690,8 +698,32 @@ document.addEventListener("DOMContentLoaded", () => {
   if (fileBtn) {
     fileBtn.onclick = (e) => {
       e.preventDefault();
-      fileInput.click();
+      e.stopPropagation();
+      
+      // Для мобильных устройств
+      if (window.innerWidth <= 768) {
+        // На телефонах просто открываем выбор файла
+        fileInput.click();
+      } else {
+        fileInput.click();
+      }
     };
+  }
+
+  // Обработка выбора файла
+  if (fileInput) {
+    fileInput.addEventListener('change', function(e) {
+      if (this.files.length > 0) {
+        console.log('File selected:', this.files[0].name);
+        // Можно показать превью или сразу отправить
+        if (window.innerWidth <= 768) {
+          // На телефоне можно автоматически отправлять после выбора
+          if (confirm(`Отправить файл ${this.files[0].name}?`)) {
+            sendMessage(new Event('submit'));
+          }
+        }
+      }
+    });
   }
 
   // ============== MOBILE MENU ==============
@@ -815,6 +847,23 @@ document.addEventListener("DOMContentLoaded", () => {
       e.target.classList.add('hidden');
     }
   });
+
+  // Добавляем стиль для загрузки
+  const style = document.createElement('style');
+  style.textContent = `
+    .send-btn.loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .send-btn.loading svg {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
 
   console.log('🚀 App fully loaded');
 });

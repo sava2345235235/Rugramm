@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== ADD USER - ИСПРАВЛЕНО ==============
+  // ============== ADD USER ==============
   
   function showAddUserModal() {
     console.log("Opening add user modal");
@@ -228,7 +228,6 @@ document.addEventListener("DOMContentLoaded", () => {
       showAddUserModal();
     };
     
-    // Для мобильных
     addUserBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -346,7 +345,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Функция добавления пользователя - ИСПРАВЛЕНО
+  // ============== CREATE CHAT - ИСПРАВЛЕНО ==============
+  
   async function handleAddUser() {
     console.log("handleAddUser called");
     
@@ -385,16 +385,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Проверяем существующий чат
-    const existingChat = chats.find(chat => 
-      chat.members && 
-      chat.members.includes(currentUser.id) && 
-      chat.members.includes(user.id)
-    );
+    const existingChat = chats.find(chat => {
+      if (!chat.members) return false;
+      return chat.members.includes(currentUser.id) && chat.members.includes(user.id);
+    });
 
     if (existingChat) {
       console.log("Existing chat found:", existingChat);
       addUserModal.classList.add("hidden");
-      openChat(existingChat);
+      await openChat(existingChat);
       return;
     }
 
@@ -406,15 +405,32 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ members: [currentUser.id, user.id] })
       });
 
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
       console.log("Create chat response:", data);
 
-      if (data.success) {
+      if (data.success && data.chat) {
+        console.log("Chat created successfully:", data.chat);
+        
+        // Добавляем созданный чат в список
+        const newChat = data.chat;
+        
+        // Добавляем информацию о другом пользователе
+        newChat.otherUser = {
+          id: user.id,
+          username: user.username,
+          avatar: user.avatar,
+          online: user.online
+        };
+        
+        chats.unshift(newChat); // Добавляем в начало списка
+        renderChats(chats);
+        
         addUserModal.classList.add("hidden");
-        await loadChats();
-        if (data.chat) {
-          openChat(data.chat);
-        }
+        await openChat(newChat);
       } else {
         alert(data.error || "Ошибка при создании чата");
       }
@@ -429,19 +445,19 @@ document.addEventListener("DOMContentLoaded", () => {
     confirmAddUser.onclick = null;
     
     // Добавляем новый обработчик
-    confirmAddUser.addEventListener('click', (e) => {
+    confirmAddUser.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
       console.log("Confirm add user clicked");
-      handleAddUser();
+      await handleAddUser();
     });
     
     // Для мобильных
-    confirmAddUser.addEventListener('touchstart', (e) => {
+    confirmAddUser.addEventListener('touchstart', async (e) => {
       e.preventDefault();
       e.stopPropagation();
       console.log("Confirm add user touched");
-      handleAddUser();
+      await handleAddUser();
     }, { passive: false });
   }
 
@@ -551,6 +567,9 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadChats() {
     try {
       const res = await fetch(`/data/${currentUser.id}`);
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
       const data = await res.json();
       chats = data.chats || [];
       console.log("Chats loaded:", chats);

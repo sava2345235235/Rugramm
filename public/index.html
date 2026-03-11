@@ -255,15 +255,6 @@
       text-align: center;
     }
 
-    .online-indicator {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #48bb78;
-      display: inline-block;
-      margin-right: 5px;
-    }
-
     /* Chats List */
     .chats-list {
       flex: 1;
@@ -533,10 +524,10 @@
       display: none;
     }
 
-    /* Emoji Panel */
+    /* Emoji Panel - ИСПРАВЛЕНО */
     .emoji-panel {
       position: absolute;
-      bottom: 90px;
+      bottom: 80px;
       right: 30px;
       background: white;
       border-radius: 15px;
@@ -547,6 +538,7 @@
       width: 280px;
       border: 1px solid #e9ecef;
       box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      z-index: 1001;
     }
 
     .emoji-panel.show {
@@ -845,6 +837,26 @@
     }
 
     /* Add User Button */
+    .add-user-btn-small {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #667eea;
+      color: white;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .add-user-btn-small:hover {
+      transform: scale(1.1);
+      background: #5a67d8;
+    }
+
     .add-user-btn {
       position: fixed;
       bottom: 20px;
@@ -921,35 +933,6 @@
       height: auto;
       border-radius: 10px;
     }
-
-    .call-button {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      font-size: 24px;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.2s;
-    }
-
-    .call-button:hover {
-      transform: scale(1.1);
-    }
-
-    .call-button.accept {
-      background: #48bb78;
-      color: white;
-    }
-
-    .call-button.reject {
-      background: #e53e3e;
-      color: white;
-    }
-
-    .call-button.mute {
-      background: #667eea;
-      color: white;
-    }
   </style>
 </head>
 <body>
@@ -998,6 +981,7 @@
       <div class="recent-section">
         <div class="section-title">
           <span>Недавние</span>
+          <button class="add-user-btn-small" id="addUserBtn" title="Добавить пользователя">+</button>
         </div>
         <div class="chats-list" id="chatsContainer"></div>
       </div>
@@ -1032,7 +1016,7 @@
 
       <div class="messages-container" id="messages"></div>
 
-      <form class="send-form" id="sendForm">
+      <form class="send-form" id="sendForm" onsubmit="return false;">
         <button type="button" class="emoji-btn" id="emojiBtn">😊</button>
         <input type="text" class="message-input" id="messageInput" placeholder="Сообщение">
         <input type="file" class="file-input" id="fileInput">

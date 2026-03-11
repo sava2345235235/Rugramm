@@ -53,6 +53,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.getElementById("searchInput");
   const audioCallBtn = document.getElementById("audioCallBtn");
   const videoCallBtn = document.getElementById("videoCallBtn");
+  const addUserBtn = document.getElementById("addUserBtn");
+  const sendBtn = document.getElementById("sendBtn");
 
   // Modals
   const addUserModal = document.getElementById("addUserModal");
@@ -115,13 +117,16 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   if (emojiBtn) {
-    emojiBtn.onclick = () => {
+    emojiBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       emojiPanel.classList.toggle("show");
     };
   }
 
   if (fileBtn) {
-    fileBtn.onclick = () => {
+    fileBtn.onclick = (e) => {
+      e.preventDefault();
       fileInput.click();
     };
   }
@@ -592,8 +597,11 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.appendChild(messageDiv);
   }
 
+  // ============== SEND MESSAGE - ИСПРАВЛЕНО ==============
+
   async function sendMessage(e) {
     e.preventDefault();
+    e.stopPropagation();
 
     if (!currentChat) {
       alert("Выберите чат");
@@ -626,6 +634,22 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("Error sending message:", err);
     }
+  }
+
+  // Отдельные обработчики для отправки
+  if (sendBtn) {
+    sendBtn.onclick = async (e) => {
+      e.preventDefault();
+      await sendMessage(e);
+    };
+  }
+
+  if (sendForm) {
+    sendForm.onsubmit = async (e) => {
+      e.preventDefault();
+      await sendMessage(e);
+      return false;
+    };
   }
 
   // ============== SETTINGS ==============
@@ -729,6 +753,39 @@ document.addEventListener("DOMContentLoaded", () => {
     userProfile.onclick = showSettingsModal;
   }
 
+  // ============== CALL FUNCTIONS (упрощенно) ==============
+
+  let peerConnection;
+  let localStream;
+  let remoteStream;
+  let currentCall = null;
+  let callType = null;
+  const iceServers = {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' }
+    ]
+  };
+
+  async function startCall(type) {
+    if (!currentChat) {
+      alert("Выберите чат");
+      return;
+    }
+
+    const otherUser = currentChat.otherUser;
+    if (!otherUser || !otherUser.online) {
+      alert("Пользователь не в сети");
+      return;
+    }
+
+    alert(`Звонок ${type} пользователю ${otherUser.username} (функция в разработке)`);
+  }
+
+  if (audioCallBtn) audioCallBtn.onclick = () => startCall('audio');
+  if (videoCallBtn) videoCallBtn.onclick = () => startCall('video');
+
   // ============== SOCKET EVENTS ==============
 
   socket.on("newMessage", (data) => {
@@ -772,12 +829,18 @@ document.addEventListener("DOMContentLoaded", () => {
   registerBtn.onclick = register;
   loginBtn.onclick = login;
   if (logoutBtn) logoutBtn.onclick = logout;
-  if (sendForm) sendForm.onsubmit = sendMessage;
 
   // Close modals when clicking outside
   window.addEventListener("click", (e) => {
     if (e.target.classList.contains('modal')) {
       e.target.classList.add('hidden');
+    }
+  });
+
+  // Close emoji panel when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!emojiBtn?.contains(e.target) && !emojiPanel?.contains(e.target)) {
+      emojiPanel?.classList.remove("show");
     }
   });
 

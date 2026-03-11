@@ -36,7 +36,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const messageInput = document.getElementById("messageInput");
   const messagesDiv = document.getElementById("messages");
   const chatsContainer = document.getElementById("chatsContainer");
-  const pinnedContainer = document.getElementById("pinnedContainer");
   const errorP = document.getElementById("error");
   const userProfile = document.getElementById("userProfile");
   const userAvatar = document.getElementById("userAvatar");
@@ -44,26 +43,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatName = document.getElementById("chatName");
   const chatStatus = document.getElementById("chatStatus");
   const fileInput = document.getElementById("fileInput");
-  const fileBtn = document.getElementById("fileBtn");
-  const emojiBtn = document.getElementById("emojiBtn");
-  const emojiPanel = document.getElementById("emojiPanel");
+  const fileBtn = document.getElementById("fileBtn") || document.getElementById("attachBtn");
+  const sendBtn = document.getElementById("sendBtn");
   const mobileMenuBtn = document.getElementById("mobileMenuBtn");
   const sidebar = document.getElementById("sidebar");
-  const logoutBtn = document.getElementById("logoutBtn");
   const searchInput = document.getElementById("searchInput");
   const audioCallBtn = document.getElementById("audioCallBtn");
   const videoCallBtn = document.getElementById("videoCallBtn");
-  const addUserBtn = document.getElementById("addUserBtn");
-  const sendBtn = document.getElementById("sendBtn");
 
-  // Modals
+  // New elements
+  const addUserBtn = document.getElementById("addUserBtn");
+  const settingsModal = document.getElementById("settingsModal");
   const addUserModal = document.getElementById("addUserModal");
   const addUsernameInput = document.getElementById("addUsernameInput");
   const userSearchResults = document.getElementById("userSearchResults");
   const confirmAddUser = document.getElementById("confirmAddUser");
   const closeAddUser = document.getElementById("closeAddUser");
-
-  const settingsModal = document.getElementById("settingsModal");
   const settingsAvatar = document.getElementById("settingsAvatar");
   const settingsUsername = document.getElementById("settingsUsername");
   const settingsUsernameDisplay = document.getElementById("settingsUsernameDisplay");
@@ -74,103 +69,178 @@ document.addEventListener("DOMContentLoaded", () => {
   const avatarUpload = document.getElementById("avatarUpload");
   const saveSettings = document.getElementById("saveSettings");
   const closeSettings = document.getElementById("closeSettings");
+  const logoutBtn = document.getElementById("logoutBtn");
 
-  const callModal = document.getElementById("callModal");
-  const incomingCall = document.getElementById("incomingCall");
-  const outgoingCall = document.getElementById("outgoingCall");
-  const activeCall = document.getElementById("activeCall");
-  const callerAvatar = document.getElementById("callerAvatar");
-  const callerName = document.getElementById("callerName");
-  const callTypeElement = document.getElementById("callType");
-  const calleeAvatar = document.getElementById("calleeAvatar");
-  const calleeName = document.getElementById("calleeName");
-  const rejectCall = document.getElementById("rejectCall");
-  const acceptCall = document.getElementById("acceptCall");
-  const cancelCall = document.getElementById("cancelCall");
-  const endCall = document.getElementById("endCall");
-  const toggleMute = document.getElementById("toggleMute");
-  const toggleVideo = document.getElementById("toggleVideo");
-  const localVideo = document.getElementById("localVideo");
-  const remoteVideo = document.getElementById("remoteVideo");
+  // ============== PROFILE SETTINGS ==============
 
-  // Check saved user
-  const savedUser = localStorage.getItem("currentUser");
-  if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    initChatScreen();
-    if (socket.connected) {
-      socket.emit("login", currentUser.id);
-    }
-  }
-
-  // Emojis
-  const emojis = ["😀", "😂", "😎", "😍", "😭", "🔥", "❤️", "👍", "🎉", "😅", "🥳", "🤔", "👋", "🤝", "👍🏻", "👎", "👌", "✌️", "🤞", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇"];
-  emojis.forEach(e => {
-    const span = document.createElement("span");
-    span.className = "emoji";
-    span.textContent = e;
-    span.onclick = () => {
-      messageInput.value += e;
-      emojiPanel.classList.remove("show");
-    };
-    emojiPanel.appendChild(span);
-  });
-
-  if (emojiBtn) {
-    emojiBtn.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      emojiPanel.classList.toggle("show");
+  // Open settings modal
+  if (userProfile) {
+    userProfile.onclick = () => {
+      console.log("Opening settings modal");
+      if (settingsModal && currentUser) {
+        settingsModal.classList.remove("hidden");
+        
+        // Load user data
+        settingsAvatar.src = currentUser.avatar || '/uploads/default-avatar.png';
+        settingsUsername.value = currentUser.username;
+        if (settingsUsernameDisplay) settingsUsernameDisplay.textContent = currentUser.username;
+        if (settingsUserId) settingsUserId.textContent = currentUser.id;
+        if (settingsCreatedAt) settingsCreatedAt.textContent = currentUser.createdAt || new Date().toLocaleDateString();
+        
+        notificationSound.checked = userSettings.notificationSound !== false;
+        themeSelect.value = userSettings.theme || 'light';
+      }
     };
   }
 
-  if (fileBtn) {
-    fileBtn.onclick = (e) => {
-      e.preventDefault();
-      fileInput.click();
+  // Close settings modal
+  if (closeSettings) {
+    closeSettings.onclick = () => {
+      settingsModal.classList.add("hidden");
     };
   }
 
-  if (mobileMenuBtn) {
-    mobileMenuBtn.onclick = () => {
-      sidebar.classList.toggle("show");
-    };
-  }
-
-  // Search functionality
-  if (searchInput) {
-    let searchTimeout;
-    searchInput.addEventListener("input", () => {
-      clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(() => {
-        filterChats(searchInput.value);
-      }, 300);
+  // Avatar upload
+  if (avatarUpload) {
+    avatarUpload.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          settingsAvatar.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
     });
   }
 
-  function filterChats(query) {
-    if (!query) {
-      renderChats(chats);
-      return;
-    }
+  // Save settings
+  if (saveSettings) {
+    saveSettings.onclick = async () => {
+      const newUsername = settingsUsername.value.trim();
+      const newAvatar = settingsAvatar.src;
 
-    const filtered = chats.filter(chat => 
-      chat.otherUser?.username.toLowerCase().includes(query.toLowerCase())
-    );
-    renderChats(filtered);
+      if (newUsername && newUsername !== currentUser.username) {
+        currentUser.username = newUsername;
+        userName.textContent = newUsername;
+      }
+
+      if (newAvatar !== currentUser.avatar && newAvatar.startsWith('data:')) {
+        const blob = await fetch(newAvatar).then(r => r.blob());
+        const formData = new FormData();
+        formData.append("avatar", blob, "avatar.png");
+        formData.append("userId", currentUser.id);
+
+        try {
+          const res = await fetch("/uploadAvatar", {
+            method: "POST",
+            body: formData
+          });
+          const data = await res.json();
+          if (data.success) {
+            currentUser.avatar = data.avatarUrl;
+            userAvatar.src = data.avatarUrl;
+          }
+        } catch (err) {
+          console.error("Error uploading avatar:", err);
+        }
+      } else if (newAvatar !== currentUser.avatar) {
+        currentUser.avatar = newAvatar;
+        userAvatar.src = newAvatar;
+      }
+
+      userSettings = {
+        ...userSettings,
+        notificationSound: notificationSound.checked,
+        theme: themeSelect.value
+      };
+
+      localStorage.setItem("userSettings", JSON.stringify(userSettings));
+      localStorage.setItem("currentUser", JSON.stringify(currentUser));
+
+      try {
+        await fetch("/updateProfile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: currentUser.id,
+            username: currentUser.username,
+            avatar: currentUser.avatar
+          })
+        });
+      } catch (err) {
+        console.error("Error updating profile:", err);
+      }
+
+      settingsModal.classList.add("hidden");
+    };
+  }
+
+  // ============== LOGOUT ==============
+  if (logoutBtn) {
+    logoutBtn.onclick = () => {
+      console.log("Logging out...");
+      
+      localStorage.removeItem("currentUser");
+      localStorage.removeItem("userSettings");
+      
+      currentUser = null;
+      currentChat = null;
+      users = [];
+      chats = [];
+      
+      if (socket) {
+        socket.disconnect();
+      }
+      
+      chatScreen.classList.add("hidden");
+      loginScreen.classList.remove("hidden");
+      
+      usernameInput.value = "";
+      passwordInput.value = "";
+      errorP.innerText = "";
+      
+      messagesDiv.innerHTML = "";
+      chatsContainer.innerHTML = "";
+      
+      chatName.textContent = "Выберите чат";
+      chatStatus.textContent = "";
+      
+      settingsModal.classList.add("hidden");
+      
+      console.log("User logged out successfully");
+    };
   }
 
   // ============== ADD USER ==============
   
   function showAddUserModal() {
+    console.log("Opening add user modal");
     if (addUserModal) {
       addUserModal.classList.remove("hidden");
-      addUsernameInput.value = "";
-      userSearchResults.innerHTML = "";
-      addUsernameInput.focus();
+      if (addUsernameInput) {
+        addUsernameInput.value = "";
+      }
+      if (userSearchResults) {
+        userSearchResults.innerHTML = "";
+      }
+      if (addUsernameInput) {
+        addUsernameInput.focus();
+      }
     }
   }
 
+  if (addUserBtn) {
+    addUserBtn.onclick = showAddUserModal;
+  }
+
+  if (closeAddUser) {
+    closeAddUser.onclick = () => {
+      addUserModal.classList.add("hidden");
+    };
+  }
+
+  // Search users as you type
   if (addUsernameInput) {
     let searchUserTimeout;
     addUsernameInput.addEventListener("input", () => {
@@ -178,11 +248,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const query = addUsernameInput.value.trim();
       
       if (query.length < 1) {
-        userSearchResults.innerHTML = "";
+        if (userSearchResults) userSearchResults.innerHTML = "";
         return;
       }
 
-      userSearchResults.innerHTML = '<div class="spinner"></div>';
+      if (userSearchResults) {
+        userSearchResults.innerHTML = '<div class="spinner" style="text-align:center; padding:20px;">🔍 Поиск...</div>';
+      }
 
       searchUserTimeout = setTimeout(() => {
         searchUsers(query);
@@ -198,40 +270,52 @@ document.addEventListener("DOMContentLoaded", () => {
       const filteredUsers = await res.json();
 
       if (filteredUsers.length === 0) {
-        userSearchResults.innerHTML = '<div class="empty-state"><span>😕</span><br>Пользователи не найдены</div>';
+        if (userSearchResults) {
+          userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af;">😕 Пользователи не найдены</div>';
+        }
         return;
       }
 
-      userSearchResults.innerHTML = filteredUsers.map(user => `
-        <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
-          <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
-          <div class="user-info">
-            <div class="user-name">${user.username}</div>
-            <div class="user-status">
-              <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
-              <span style="color: ${user.online ? '#48bb78' : '#9ca3af'};">
-                ${user.online ? 'в сети' : 'не в сети'}
-              </span>
+      if (userSearchResults) {
+        userSearchResults.innerHTML = filteredUsers.map(user => `
+          <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
+            <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
+            <div class="user-info">
+              <div class="user-name">${user.username}</div>
+              <div class="user-status">
+                <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
+                <span style="color: ${user.online ? '#22c55e' : '#9ca3af'};">
+                  ${user.online ? 'в сети' : 'не в сети'}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      `).join('');
+        `).join('');
 
-      document.querySelectorAll('.user-search-item').forEach(item => {
-        item.addEventListener('click', () => {
-          const username = item.dataset.username;
-          addUsernameInput.value = '@' + username;
-          userSearchResults.innerHTML = '';
+        document.querySelectorAll('.user-search-item').forEach(item => {
+          item.addEventListener('click', () => {
+            const username = item.dataset.username;
+            if (addUsernameInput) {
+              addUsernameInput.value = '@' + username;
+            }
+            if (userSearchResults) {
+              userSearchResults.innerHTML = '';
+            }
+          });
         });
-      });
+      }
     } catch (err) {
       console.error("Error searching users:", err);
-      userSearchResults.innerHTML = '<div class="empty-state"><span>❌</span><br>Ошибка поиска</div>';
+      if (userSearchResults) {
+        userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#ef4444;">❌ Ошибка поиска</div>';
+      }
     }
   }
 
   if (confirmAddUser) {
     confirmAddUser.onclick = async () => {
+      if (!addUsernameInput) return;
+      
       let username = addUsernameInput.value.trim();
       
       if (!username) {
@@ -284,16 +368,6 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Ошибка при создании чата");
       }
     };
-  }
-
-  if (closeAddUser) {
-    closeAddUser.onclick = () => {
-      addUserModal.classList.add("hidden");
-    };
-  }
-
-  if (addUserBtn) {
-    addUserBtn.onclick = showAddUserModal;
   }
 
   // ============== REGISTER & LOGIN ==============
@@ -376,46 +450,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ============== LOGOUT - ИСПРАВЛЕНО ==============
-  function logout() {
-    console.log("Logging out...");
-    
-    // Очищаем данные пользователя из localStorage
-    localStorage.removeItem("currentUser");
-    localStorage.removeItem("userSettings");
-    
-    // Очищаем текущие данные
-    currentUser = null;
-    currentChat = null;
-    users = [];
-    chats = [];
-    
-    // Отключаем сокет
-    if (socket) {
-      socket.disconnect();
-    }
-    
-    // Переключаем экраны
-    chatScreen.classList.add("hidden");
-    loginScreen.classList.remove("hidden");
-    
-    // Очищаем поля ввода
-    usernameInput.value = "";
-    passwordInput.value = "";
-    errorP.innerText = "";
-    
-    // Очищаем сообщения и чаты
-    messagesDiv.innerHTML = "";
-    chatsContainer.innerHTML = "";
-    if (pinnedContainer) pinnedContainer.innerHTML = "";
-    
-    // Сбрасываем заголовок чата
-    chatName.textContent = "Выберите чат";
-    chatStatus.textContent = "";
-    
-    console.log("User logged out successfully");
-  }
-
   // ============== CHAT FUNCTIONS ==============
 
   async function initChatScreen() {
@@ -460,7 +494,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!chatsContainer) return;
     
     chatsContainer.innerHTML = "";
-    if (pinnedContainer) pinnedContainer.innerHTML = "";
 
     if (chatsToRender.length === 0) {
       const empty = document.createElement("div");
@@ -472,27 +505,19 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const pinned = chatsToRender.filter(chat => chat.pinned);
-    const regular = chatsToRender.filter(chat => !chat.pinned);
-
-    pinned.forEach(chat => {
-      const element = createChatElement(chat, true);
-      if (pinnedContainer) pinnedContainer.appendChild(element);
-    });
-
-    regular.forEach(chat => {
-      const element = createChatElement(chat, false);
+    chatsToRender.forEach(chat => {
+      const element = createChatElement(chat);
       chatsContainer.appendChild(element);
     });
   }
 
-  function createChatElement(chat, isPinned) {
+  function createChatElement(chat) {
     const otherUser = chat.otherUser || { username: "Пользователь", avatar: "/uploads/default-avatar.png" };
     const lastMessage = chat.messages[chat.messages.length - 1];
     const unreadCount = chat.messages.filter(m => !m.read && m.userId !== currentUser.id).length;
 
     const div = document.createElement("div");
-    div.className = isPinned ? "pinned-item" : "chat-item";
+    div.className = "chat-item";
     if (currentChat && currentChat.id === chat.id) {
       div.classList.add("active");
     }
@@ -501,35 +526,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const time = lastMessage ? formatTime(lastMessage.timestamp) : '';
     const lastMessageText = lastMessage ? (lastMessage.text || '📎 Файл') : 'Нет сообщений';
 
-    if (isPinned) {
-      div.innerHTML = `
-        <img src="${otherUser.avatar || '/uploads/default-avatar.png'}" class="pinned-avatar" onerror="this.src='/uploads/default-avatar.png'">
-        <div class="pinned-info">
-          <div class="pinned-name">
-            <h4>${otherUser.username}</h4>
-            <span class="time">${time}</span>
-          </div>
-          <div class="pinned-message">
-            <span>${lastMessageText}</span>
-            ${unreadCount > 0 ? `<span class="badge">${unreadCount}</span>` : ''}
-          </div>
+    div.innerHTML = `
+      <div class="chat-avatar">${otherUser.username.charAt(0)}</div>
+      <div class="chat-info">
+        <div class="chat-name-row">
+          <span class="chat-name">${otherUser.username}</span>
+          <span class="chat-time">${time}</span>
         </div>
-      `;
-    } else {
-      div.innerHTML = `
-        <img src="${otherUser.avatar || '/uploads/default-avatar.png'}" class="chat-avatar" onerror="this.src='/uploads/default-avatar.png'">
-        <div class="chat-info">
-          <div class="chat-name-row">
-            <span class="chat-name">${otherUser.username}</span>
-            <span class="chat-time">${time}</span>
-          </div>
-          <div class="chat-last-message">
-            <span>${lastMessageText}</span>
-            ${unreadCount > 0 ? `<span class="unread-count">${unreadCount}</span>` : ''}
-          </div>
+        <div class="chat-last-message">
+          <span class="last-message-text">${lastMessageText}</span>
+          ${unreadCount > 0 ? `<span class="unread-count">${unreadCount}</span>` : ''}
         </div>
-      `;
-    }
+      </div>
+    `;
 
     return div;
   }
@@ -555,8 +564,7 @@ document.addEventListener("DOMContentLoaded", () => {
     chatName.textContent = otherUser.username;
     
     const isOnline = users.find(u => u.id === otherUser.id)?.online;
-    chatStatus.textContent = isOnline ? "в сети" : "не в сети";
-    chatStatus.style.color = isOnline ? "#48bb78" : "#9ca3af";
+    chatStatus.innerHTML = isOnline ? '<span class="online-dot"></span> online' : 'не в сети';
 
     renderMessages(chat.messages);
 
@@ -591,7 +599,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function addMessageToDOM(msg) {
     const messageDiv = document.createElement("div");
-    messageDiv.className = `message ${msg.userId === currentUser.id ? 'self' : 'other'}`;
+    messageDiv.className = `message ${msg.userId === currentUser.id ? 'my-message' : 'their-message'}`;
 
     let content = '<div class="message-bubble">';
     
@@ -601,12 +609,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (msg.text) {
-      content += `<div class="message-text">${msg.text}</div>`;
+      content += `<div>${msg.text}</div>`;
     }
 
     if (msg.file) {
-      const fileName = msg.file.split('_').pop() || 'файл';
-      content += `<div class="message-file"><a href="${msg.file}" target="_blank">📎 ${fileName}</a></div>`;
+      const isImage = msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+      if (isImage) {
+        content += `<div class="message-file"><img src="${msg.file}" alt="image"></div>`;
+      } else {
+        const fileName = msg.file.split('_').pop() || 'файл';
+        content += `<div class="message-file"><a href="${msg.file}" target="_blank">📎 ${fileName}</a></div>`;
+      }
     }
 
     const readStatus = msg.read ? '✓✓' : '✓';
@@ -657,7 +670,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Отдельные обработчики для отправки
   if (sendBtn) {
     sendBtn.onclick = async (e) => {
       e.preventDefault();
@@ -673,139 +685,77 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== SETTINGS ==============
+  // ============== FILE ATTACHMENT ==============
 
-  function showSettingsModal() {
-    if (!settingsModal) return;
-    
-    settingsModal.classList.remove("hidden");
-    
-    settingsAvatar.src = currentUser.avatar || '/uploads/default-avatar.png';
-    settingsUsername.value = currentUser.username;
-    settingsUsernameDisplay.textContent = currentUser.username;
-    settingsUserId.textContent = currentUser.id;
-    settingsCreatedAt.textContent = currentUser.createdAt || new Date().toLocaleDateString();
-    
-    notificationSound.checked = userSettings.notificationSound !== false;
-    themeSelect.value = userSettings.theme || 'light';
+  if (fileBtn) {
+    fileBtn.onclick = (e) => {
+      e.preventDefault();
+      fileInput.click();
+    };
   }
 
-  if (avatarUpload) {
-    avatarUpload.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          settingsAvatar.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+  // ============== MOBILE MENU ==============
+
+  if (mobileMenuBtn) {
+    mobileMenuBtn.onclick = () => {
+      sidebar.classList.toggle("show");
+    };
+  }
+
+  // Close sidebar on mobile when clicking outside
+  document.addEventListener("click", (e) => {
+    if (window.innerWidth <= 768) {
+      if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+        sidebar.classList.remove("show");
       }
+    }
+  });
+
+  // ============== SEARCH ==============
+
+  if (searchInput) {
+    let searchTimeout;
+    searchInput.addEventListener("input", () => {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        filterChats(searchInput.value);
+      }, 300);
     });
   }
 
-  if (saveSettings) {
-    saveSettings.onclick = async () => {
-      const newUsername = settingsUsername.value.trim();
-      const newAvatar = settingsAvatar.src;
-
-      if (newUsername && newUsername !== currentUser.username) {
-        currentUser.username = newUsername;
-        userName.textContent = newUsername;
-      }
-
-      if (newAvatar !== currentUser.avatar && newAvatar.startsWith('data:')) {
-        const blob = await fetch(newAvatar).then(r => r.blob());
-        const formData = new FormData();
-        formData.append("avatar", blob, "avatar.png");
-        formData.append("userId", currentUser.id);
-
-        try {
-          const res = await fetch("/uploadAvatar", {
-            method: "POST",
-            body: formData
-          });
-          const data = await res.json();
-          if (data.success) {
-            currentUser.avatar = data.avatarUrl;
-            userAvatar.src = data.avatarUrl;
-          }
-        } catch (err) {
-          console.error("Error uploading avatar:", err);
-        }
-      } else if (newAvatar !== currentUser.avatar) {
-        currentUser.avatar = newAvatar;
-        userAvatar.src = newAvatar;
-      }
-
-      userSettings = {
-        ...userSettings,
-        notificationSound: notificationSound.checked,
-        theme: themeSelect.value
-      };
-
-      localStorage.setItem("userSettings", JSON.stringify(userSettings));
-      localStorage.setItem("currentUser", JSON.stringify(currentUser));
-
-      try {
-        await fetch("/updateProfile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: currentUser.id,
-            username: currentUser.username,
-            avatar: currentUser.avatar
-          })
-        });
-      } catch (err) {
-        console.error("Error updating profile:", err);
-      }
-
-      settingsModal.classList.add("hidden");
-    };
-  }
-
-  if (closeSettings) {
-    closeSettings.onclick = () => {
-      settingsModal.classList.add("hidden");
-    };
-  }
-
-  if (userProfile) {
-    userProfile.onclick = showSettingsModal;
-  }
-
-  // ============== CALL FUNCTIONS (упрощенно) ==============
-
-  let peerConnection;
-  let localStream;
-  let remoteStream;
-  let currentCall = null;
-  let callType = null;
-  const iceServers = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' }
-    ]
-  };
-
-  async function startCall(type) {
-    if (!currentChat) {
-      alert("Выберите чат");
+  function filterChats(query) {
+    if (!query) {
+      renderChats(chats);
       return;
     }
 
-    const otherUser = currentChat.otherUser;
-    if (!otherUser || !otherUser.online) {
-      alert("Пользователь не в сети");
-      return;
-    }
-
-    alert(`Звонок ${type} пользователю ${otherUser.username} (функция в разработке)`);
+    const filtered = chats.filter(chat => 
+      chat.otherUser?.username.toLowerCase().includes(query.toLowerCase())
+    );
+    renderChats(filtered);
   }
 
-  if (audioCallBtn) audioCallBtn.onclick = () => startCall('audio');
-  if (videoCallBtn) videoCallBtn.onclick = () => startCall('video');
+  // ============== CALL BUTTONS ==============
+
+  if (audioCallBtn) {
+    audioCallBtn.onclick = () => {
+      if (!currentChat) {
+        alert("Выберите чат");
+        return;
+      }
+      alert("Голосовой звонок (в разработке)");
+    };
+  }
+
+  if (videoCallBtn) {
+    videoCallBtn.onclick = () => {
+      if (!currentChat) {
+        alert("Выберите чат");
+        return;
+      }
+      alert("Видеозвонок (в разработке)");
+    };
+  }
 
   // ============== SOCKET EVENTS ==============
 
@@ -839,8 +789,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentChat) {
       const otherUser = currentChat.otherUser;
       if (otherUser && otherUser.id === data.userId) {
-        chatStatus.textContent = data.online ? "в сети" : "не в сети";
-        chatStatus.style.color = data.online ? "#48bb78" : "#9ca3af";
+        chatStatus.innerHTML = data.online ? '<span class="online-dot"></span> online' : 'не в сети';
       }
     }
   });
@@ -849,22 +798,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   registerBtn.onclick = register;
   loginBtn.onclick = login;
-  if (logoutBtn) {
-    logoutBtn.onclick = logout;
-    console.log("Logout button handler attached");
+
+  // Check saved user
+  const savedUser = localStorage.getItem("currentUser");
+  if (savedUser) {
+    currentUser = JSON.parse(savedUser);
+    initChatScreen();
+    if (socket.connected) {
+      socket.emit("login", currentUser.id);
+    }
   }
 
   // Close modals when clicking outside
   window.addEventListener("click", (e) => {
     if (e.target.classList.contains('modal')) {
       e.target.classList.add('hidden');
-    }
-  });
-
-  // Close emoji panel when clicking outside
-  document.addEventListener("click", (e) => {
-    if (!emojiBtn?.contains(e.target) && !emojiPanel?.contains(e.target)) {
-      emojiPanel?.classList.remove("show");
     }
   });
 

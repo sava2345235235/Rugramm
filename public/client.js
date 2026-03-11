@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const chatName = document.getElementById("chatName");
   const chatStatus = document.getElementById("chatStatus");
   const fileInput = document.getElementById("fileInput");
-  const fileBtn = document.getElementById("attachBtn") || document.getElementById("fileBtn");
+  const fileBtn = document.getElementById("attachBtn");
   const sendBtn = document.getElementById("sendBtn");
   const mobileMenuBtn = document.getElementById("mobileMenuBtn");
   const sidebar = document.getElementById("sidebar");
@@ -61,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const closeAddUser = document.getElementById("closeAddUser");
   const settingsAvatar = document.getElementById("settingsAvatar");
   const settingsUsername = document.getElementById("settingsUsername");
-  const settingsUsernameDisplay = document.getElementById("settingsUsernameDisplay");
   const settingsUserId = document.getElementById("settingsUserId");
   const settingsCreatedAt = document.getElementById("settingsCreatedAt");
   const notificationSound = document.getElementById("notificationSound");
@@ -73,17 +72,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ============== PROFILE SETTINGS ==============
 
-  // Open settings modal
   if (userProfile) {
     userProfile.onclick = () => {
       console.log("Opening settings modal");
       if (settingsModal && currentUser) {
         settingsModal.classList.remove("hidden");
         
-        // Load user data
         settingsAvatar.src = currentUser.avatar || '/uploads/default-avatar.png';
         settingsUsername.value = currentUser.username;
-        if (settingsUsernameDisplay) settingsUsernameDisplay.textContent = currentUser.username;
         if (settingsUserId) settingsUserId.textContent = currentUser.id;
         if (settingsCreatedAt) settingsCreatedAt.textContent = currentUser.createdAt || new Date().toLocaleDateString();
         
@@ -93,14 +89,12 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Close settings modal
   if (closeSettings) {
     closeSettings.onclick = () => {
       settingsModal.classList.add("hidden");
     };
   }
 
-  // Avatar upload
   if (avatarUpload) {
     avatarUpload.addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -114,7 +108,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Save settings
   if (saveSettings) {
     saveSettings.onclick = async () => {
       const newUsername = settingsUsername.value.trim();
@@ -225,7 +218,7 @@ document.addEventListener("DOMContentLoaded", () => {
         userSearchResults.innerHTML = "";
       }
       if (addUsernameInput) {
-        addUsernameInput.focus();
+        setTimeout(() => addUsernameInput.focus(), 100);
       }
     }
   }
@@ -240,25 +233,37 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // Search users as you type
+  // Search users as you type - ИСПРАВЛЕНО
   if (addUsernameInput) {
     let searchUserTimeout;
-    addUsernameInput.addEventListener("input", () => {
+    addUsernameInput.addEventListener("input", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
       clearTimeout(searchUserTimeout);
       const query = addUsernameInput.value.trim();
       
+      console.log("Search query:", query);
+      
       if (query.length < 1) {
-        if (userSearchResults) userSearchResults.innerHTML = "";
+        if (userSearchResults) {
+          userSearchResults.innerHTML = "";
+        }
         return;
       }
 
       if (userSearchResults) {
-        userSearchResults.innerHTML = '<div style="text-align:center; padding:20px;">🔍 Поиск...</div>';
+        userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af;">🔍 Поиск...</div>';
       }
 
       searchUserTimeout = setTimeout(() => {
         searchUsers(query);
       }, 300);
+    });
+
+    // Добавляем обработчик касания для мобильных
+    addUsernameInput.addEventListener("touchstart", (e) => {
+      e.stopPropagation();
     });
   }
 
@@ -266,8 +271,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchTerm = query.startsWith('@') ? query.substring(1) : query;
     
     try {
+      console.log("Searching for:", searchTerm);
       const res = await fetch(`/search/users?q=${encodeURIComponent(searchTerm)}`);
       const filteredUsers = await res.json();
+      
+      console.log("Found users:", filteredUsers);
 
       if (filteredUsers.length === 0) {
         if (userSearchResults) {
@@ -293,7 +301,22 @@ document.addEventListener("DOMContentLoaded", () => {
         `).join('');
 
         document.querySelectorAll('.user-search-item').forEach(item => {
-          item.addEventListener('click', () => {
+          item.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const username = item.dataset.username;
+            if (addUsernameInput) {
+              addUsernameInput.value = '@' + username;
+            }
+            if (userSearchResults) {
+              userSearchResults.innerHTML = '';
+            }
+          });
+          
+          // Добавляем обработчик касания для мобильных
+          item.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const username = item.dataset.username;
             if (addUsernameInput) {
               addUsernameInput.value = '@' + username;
@@ -313,7 +336,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (confirmAddUser) {
-    confirmAddUser.onclick = async () => {
+    confirmAddUser.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
       if (!addUsernameInput) return;
       
       let username = addUsernameInput.value.trim();
@@ -368,6 +394,13 @@ document.addEventListener("DOMContentLoaded", () => {
         alert("Ошибка при создании чата");
       }
     };
+
+    // Добавляем обработчик касания для мобильных
+    confirmAddUser.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      confirmAddUser.click();
+    });
   }
 
   // ============== REGISTER & LOGIN ==============
@@ -653,8 +686,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (text) formData.append("text", text);
     if (file) formData.append("file", file);
 
-    // Показываем индикатор загрузки на мобильных
-    if (window.innerWidth <= 768) {
+    if (sendBtn) {
       sendBtn.classList.add('loading');
     }
 
@@ -674,84 +706,133 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error sending message:", err);
       alert("Ошибка при отправке");
     } finally {
-      sendBtn.classList.remove('loading');
+      if (sendBtn) {
+        sendBtn.classList.remove('loading');
+      }
     }
   }
 
   if (sendBtn) {
     sendBtn.onclick = async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       await sendMessage(e);
     };
+    
+    // Добавляем обработчик касания для мобильных
+    sendBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sendBtn.click();
+    });
   }
 
   if (sendForm) {
     sendForm.onsubmit = async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       await sendMessage(e);
       return false;
     };
   }
 
-  // ============== FILE ATTACHMENT ==============
+  // ============== FILE ATTACHMENT - ИСПРАВЛЕНО ДЛЯ ТЕЛЕФОНА ==============
 
   if (fileBtn) {
-    fileBtn.onclick = (e) => {
+    // Убираем все лишние обработчики и оставляем прямой клик
+    fileBtn.onclick = function(e) {
       e.preventDefault();
       e.stopPropagation();
+      console.log("File button clicked");
       
-      // Для мобильных устройств
-      if (window.innerWidth <= 768) {
-        // На телефонах просто открываем выбор файла
-        fileInput.click();
-      } else {
+      // Прямой вызов выбора файла
+      if (fileInput) {
         fileInput.click();
       }
     };
+    
+    // Добавляем обработчик касания для мобильных
+    fileBtn.addEventListener("touchstart", function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("File button touched");
+      
+      if (fileInput) {
+        fileInput.click();
+      }
+    }, { passive: false });
   }
 
-  // Обработка выбора файла
   if (fileInput) {
     fileInput.addEventListener('change', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      
       if (this.files.length > 0) {
         console.log('File selected:', this.files[0].name);
-        // Можно показать превью или сразу отправить
+        
+        // На мобильных автоматически отправляем
         if (window.innerWidth <= 768) {
-          // На телефоне можно автоматически отправлять после выбора
-          if (confirm(`Отправить файл ${this.files[0].name}?`)) {
-            sendMessage(new Event('submit'));
-          }
+          sendMessage(new Event('submit'));
         }
       }
+    });
+    
+    // Добавляем обработчик касания для мобильных
+    fileInput.addEventListener("touchstart", (e) => {
+      e.stopPropagation();
     });
   }
 
   // ============== MOBILE MENU ==============
 
   if (mobileMenuBtn) {
-    mobileMenuBtn.onclick = () => {
+    mobileMenuBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       sidebar.classList.toggle("show");
     };
+    
+    mobileMenuBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      sidebar.classList.toggle("show");
+    });
   }
 
   // Close sidebar on mobile when clicking outside
   document.addEventListener("click", (e) => {
     if (window.innerWidth <= 768) {
-      if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+      if (sidebar && !sidebar.contains(e.target) && mobileMenuBtn && !mobileMenuBtn.contains(e.target)) {
         sidebar.classList.remove("show");
       }
     }
   });
 
-  // ============== SEARCH ==============
+  document.addEventListener("touchstart", (e) => {
+    if (window.innerWidth <= 768) {
+      if (sidebar && !sidebar.contains(e.target) && mobileMenuBtn && !mobileMenuBtn.contains(e.target)) {
+        sidebar.classList.remove("show");
+      }
+    }
+  });
+
+  // ============== SEARCH - ИСПРАВЛЕНО ==============
 
   if (searchInput) {
     let searchTimeout;
-    searchInput.addEventListener("input", () => {
+    searchInput.addEventListener("input", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
       clearTimeout(searchTimeout);
       searchTimeout = setTimeout(() => {
         filterChats(searchInput.value);
       }, 300);
+    });
+    
+    searchInput.addEventListener("touchstart", (e) => {
+      e.stopPropagation();
     });
   }
 
@@ -770,7 +851,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============== CALL BUTTONS ==============
 
   if (audioCallBtn) {
-    audioCallBtn.onclick = () => {
+    audioCallBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (!currentChat) {
         alert("Выберите чат");
         return;
@@ -780,7 +863,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (videoCallBtn) {
-    videoCallBtn.onclick = () => {
+    videoCallBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (!currentChat) {
         alert("Выберите чат");
         return;
@@ -834,17 +919,28 @@ document.addEventListener("DOMContentLoaded", () => {
   // Check saved user
   const savedUser = localStorage.getItem("currentUser");
   if (savedUser) {
-    currentUser = JSON.parse(savedUser);
-    initChatScreen();
-    if (socket.connected) {
-      socket.emit("login", currentUser.id);
+    try {
+      currentUser = JSON.parse(savedUser);
+      initChatScreen();
+      if (socket.connected) {
+        socket.emit("login", currentUser.id);
+      }
+    } catch (err) {
+      console.error("Error parsing saved user:", err);
+      localStorage.removeItem("currentUser");
     }
   }
 
   // Close modals when clicking outside
   window.addEventListener("click", (e) => {
     if (e.target.classList.contains('modal')) {
-      e.target.classList.add('hidden');
+      e.target.classList.add("hidden");
+    }
+  });
+
+  window.addEventListener("touchstart", (e) => {
+    if (e.target.classList.contains('modal')) {
+      e.target.classList.add("hidden");
     }
   });
 

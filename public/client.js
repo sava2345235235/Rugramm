@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== ADD USER ==============
+  // ============== ADD USER - ИСПРАВЛЕНО ==============
   
   function showAddUserModal() {
     console.log("Opening add user modal");
@@ -213,27 +213,44 @@ document.addEventListener("DOMContentLoaded", () => {
       addUserModal.classList.remove("hidden");
       if (addUsernameInput) {
         addUsernameInput.value = "";
+        addUsernameInput.focus();
       }
       if (userSearchResults) {
         userSearchResults.innerHTML = "";
-      }
-      if (addUsernameInput) {
-        setTimeout(() => addUsernameInput.focus(), 100);
       }
     }
   }
 
   if (addUserBtn) {
-    addUserBtn.onclick = showAddUserModal;
+    addUserBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showAddUserModal();
+    };
+    
+    // Для мобильных
+    addUserBtn.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showAddUserModal();
+    }, { passive: false });
   }
 
   if (closeAddUser) {
-    closeAddUser.onclick = () => {
+    closeAddUser.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       addUserModal.classList.add("hidden");
     };
+    
+    closeAddUser.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      addUserModal.classList.add("hidden");
+    }, { passive: false });
   }
 
-  // Search users as you type - ИСПРАВЛЕНО
+  // Search users as you type
   if (addUsernameInput) {
     let searchUserTimeout;
     addUsernameInput.addEventListener("input", (e) => {
@@ -259,11 +276,6 @@ document.addEventListener("DOMContentLoaded", () => {
       searchUserTimeout = setTimeout(() => {
         searchUsers(query);
       }, 300);
-    });
-
-    // Добавляем обработчик касания для мобильных
-    addUsernameInput.addEventListener("touchstart", (e) => {
-      e.stopPropagation();
     });
   }
 
@@ -313,7 +325,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
           });
           
-          // Добавляем обработчик касания для мобильных
           item.addEventListener('touchstart', (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -324,7 +335,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (userSearchResults) {
               userSearchResults.innerHTML = '';
             }
-          });
+          }, { passive: false });
         });
       }
     } catch (err) {
@@ -335,72 +346,103 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  if (confirmAddUser) {
-    confirmAddUser.onclick = async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      if (!addUsernameInput) return;
-      
-      let username = addUsernameInput.value.trim();
-      
-      if (!username) {
-        alert("Введите username");
-        return;
-      }
+  // Функция добавления пользователя - ИСПРАВЛЕНО
+  async function handleAddUser() {
+    console.log("handleAddUser called");
+    
+    if (!addUsernameInput) {
+      console.error("addUsernameInput not found");
+      return;
+    }
+    
+    let username = addUsernameInput.value.trim();
+    console.log("Username to add:", username);
+    
+    if (!username) {
+      alert("Введите username");
+      return;
+    }
 
-      if (username.startsWith('@')) {
-        username = username.substring(1);
-      }
+    if (username.startsWith('@')) {
+      username = username.substring(1);
+    }
 
-      const user = users.find(u => u.username === username);
-      if (!user) {
-        alert("Пользователь не найден");
-        return;
-      }
+    console.log("Looking for user:", username);
+    console.log("Available users:", users);
 
-      if (user.id === currentUser.id) {
-        alert("Нельзя добавить самого себя");
-        return;
-      }
+    const user = users.find(u => u.username === username);
+    if (!user) {
+      console.log("User not found");
+      alert("Пользователь не найден");
+      return;
+    }
 
-      const existingChat = chats.find(chat => 
-        chat.members.includes(currentUser.id) && 
-        chat.members.includes(user.id)
-      );
+    console.log("Found user:", user);
 
-      if (existingChat) {
+    if (user.id === currentUser.id) {
+      alert("Нельзя добавить самого себя");
+      return;
+    }
+
+    // Проверяем существующий чат
+    const existingChat = chats.find(chat => 
+      chat.members && 
+      chat.members.includes(currentUser.id) && 
+      chat.members.includes(user.id)
+    );
+
+    if (existingChat) {
+      console.log("Existing chat found:", existingChat);
+      addUserModal.classList.add("hidden");
+      openChat(existingChat);
+      return;
+    }
+
+    try {
+      console.log("Creating new chat with:", user.id);
+      const res = await fetch("/createChat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ members: [currentUser.id, user.id] })
+      });
+
+      const data = await res.json();
+      console.log("Create chat response:", data);
+
+      if (data.success) {
         addUserModal.classList.add("hidden");
-        openChat(existingChat);
-        return;
-      }
-
-      try {
-        const res = await fetch("/createChat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ members: [currentUser.id, user.id] })
-        });
-
-        const data = await res.json();
-
-        if (data.success) {
-          addUserModal.classList.add("hidden");
-          await loadChats();
+        await loadChats();
+        if (data.chat) {
           openChat(data.chat);
         }
-      } catch (err) {
-        console.error("Error creating chat:", err);
-        alert("Ошибка при создании чата");
+      } else {
+        alert(data.error || "Ошибка при создании чата");
       }
-    };
+    } catch (err) {
+      console.error("Error creating chat:", err);
+      alert("Ошибка при создании чата: " + err.message);
+    }
+  }
 
-    // Добавляем обработчик касания для мобильных
-    confirmAddUser.addEventListener("touchstart", (e) => {
+  if (confirmAddUser) {
+    // Убираем все старые обработчики
+    confirmAddUser.onclick = null;
+    
+    // Добавляем новый обработчик
+    confirmAddUser.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      confirmAddUser.click();
+      console.log("Confirm add user clicked");
+      handleAddUser();
     });
+    
+    // Для мобильных
+    confirmAddUser.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Confirm add user touched");
+      handleAddUser();
+    }, { passive: false });
   }
 
   // ============== REGISTER & LOGIN ==============
@@ -500,6 +542,7 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       const res = await fetch("/users");
       users = await res.json();
+      console.log("Users loaded:", users);
     } catch (err) {
       console.error("Error loading users:", err);
     }
@@ -510,6 +553,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch(`/data/${currentUser.id}`);
       const data = await res.json();
       chats = data.chats || [];
+      console.log("Chats loaded:", chats);
       
       chats.sort((a, b) => {
         const aTime = a.messages[a.messages.length - 1]?.timestamp || 0;
@@ -719,12 +763,11 @@ document.addEventListener("DOMContentLoaded", () => {
       await sendMessage(e);
     };
     
-    // Добавляем обработчик касания для мобильных
     sendBtn.addEventListener("touchstart", (e) => {
       e.preventDefault();
       e.stopPropagation();
       sendBtn.click();
-    });
+    }, { passive: false });
   }
 
   if (sendForm) {
@@ -736,27 +779,22 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== FILE ATTACHMENT - ИСПРАВЛЕНО ДЛЯ ТЕЛЕФОНА ==============
+  // ============== FILE ATTACHMENT ==============
 
   if (fileBtn) {
-    // Убираем все лишние обработчики и оставляем прямой клик
     fileBtn.onclick = function(e) {
       e.preventDefault();
       e.stopPropagation();
       console.log("File button clicked");
-      
-      // Прямой вызов выбора файла
       if (fileInput) {
         fileInput.click();
       }
     };
     
-    // Добавляем обработчик касания для мобильных
     fileBtn.addEventListener("touchstart", function(e) {
       e.preventDefault();
       e.stopPropagation();
       console.log("File button touched");
-      
       if (fileInput) {
         fileInput.click();
       }
@@ -770,17 +808,10 @@ document.addEventListener("DOMContentLoaded", () => {
       
       if (this.files.length > 0) {
         console.log('File selected:', this.files[0].name);
-        
-        // На мобильных автоматически отправляем
         if (window.innerWidth <= 768) {
           sendMessage(new Event('submit'));
         }
       }
-    });
-    
-    // Добавляем обработчик касания для мобильных
-    fileInput.addEventListener("touchstart", (e) => {
-      e.stopPropagation();
     });
   }
 
@@ -797,7 +828,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       e.stopPropagation();
       sidebar.classList.toggle("show");
-    });
+    }, { passive: false });
   }
 
   // Close sidebar on mobile when clicking outside
@@ -817,7 +848,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ============== SEARCH - ИСПРАВЛЕНО ==============
+  // ============== SEARCH ==============
 
   if (searchInput) {
     let searchTimeout;
@@ -829,10 +860,6 @@ document.addEventListener("DOMContentLoaded", () => {
       searchTimeout = setTimeout(() => {
         filterChats(searchInput.value);
       }, 300);
-    });
-    
-    searchInput.addEventListener("touchstart", (e) => {
-      e.stopPropagation();
     });
   }
 

@@ -484,7 +484,7 @@
         }
 
         .message-file img {
-            max-width: 200px;
+            max-width: 100%;
             max-height: 200px;
             border-radius: 10px;
             border: 2px solid rgba(255,255,255,0.1);
@@ -753,7 +753,23 @@
             display: inline-block;
         }
 
-        /* Add User Modal */
+        /* Add User Modal - СПЕЦИАЛЬНО ДЛЯ ПОИСКА */
+        #addUsernameInput {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #1f2937;
+            border-radius: 10px;
+            background: #111827;
+            color: white;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        #addUsernameInput:focus {
+            outline: none;
+            border-color: #3B82F6;
+        }
+
         .user-search-item {
             padding: 12px;
             margin: 8px 0;
@@ -811,22 +827,31 @@
             background: #6b7280;
         }
 
+        #userSearchResults {
+            max-height: 250px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+
         /* Scrollbar */
         .messages-container::-webkit-scrollbar,
         .chats-list::-webkit-scrollbar,
-        .modal-content::-webkit-scrollbar {
+        .modal-content::-webkit-scrollbar,
+        #userSearchResults::-webkit-scrollbar {
             width: 6px;
         }
 
         .messages-container::-webkit-scrollbar-track,
         .chats-list::-webkit-scrollbar-track,
-        .modal-content::-webkit-scrollbar-track {
+        .modal-content::-webkit-scrollbar-track,
+        #userSearchResults::-webkit-scrollbar-track {
             background: #1f2937;
         }
 
         .messages-container::-webkit-scrollbar-thumb,
         .chats-list::-webkit-scrollbar-thumb,
-        .modal-content::-webkit-scrollbar-thumb {
+        .modal-content::-webkit-scrollbar-thumb,
+        #userSearchResults::-webkit-scrollbar-thumb {
             background: linear-gradient(135deg, #000000, #1E3A8A, #3B82F6);
             border-radius: 3px;
         }
@@ -1077,7 +1102,7 @@
                 <span style="font-size: 48px;">👤</span>
             </div>
             <input type="text" id="addUsernameInput" placeholder="@username">
-            <div id="userSearchResults" style="max-height: 250px; overflow-y: auto; margin: 15px 0;"></div>
+            <div id="userSearchResults"></div>
             <div class="settings-actions">
                 <button class="save-btn" id="confirmAddUser">Добавить</button>
                 <button class="cancel-btn" id="closeAddUser">Отмена</button>

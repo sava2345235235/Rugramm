@@ -345,7 +345,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ============== CREATE CHAT - ИСПРАВЛЕНО ==============
+  // ============== CREATE CHAT ==============
   
   async function handleAddUser() {
     console.log("handleAddUser called");
@@ -426,7 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
           online: user.online
         };
         
-        chats.unshift(newChat); // Добавляем в начало списка
+        chats.unshift(newChat);
         renderChats(chats);
         
         addUserModal.classList.add("hidden");
@@ -441,10 +441,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (confirmAddUser) {
-    // Убираем все старые обработчики
     confirmAddUser.onclick = null;
     
-    // Добавляем новый обработчик
     confirmAddUser.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -452,7 +450,6 @@ document.addEventListener("DOMContentLoaded", () => {
       await handleAddUser();
     });
     
-    // Для мобильных
     confirmAddUser.addEventListener('touchstart', async (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -727,7 +724,7 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.appendChild(messageDiv);
   }
 
-  // ============== SEND MESSAGE ==============
+  // ============== SEND MESSAGE - ИСПРАВЛЕНО (реальное время) ==============
 
   async function sendMessage(e) {
     e.preventDefault();
@@ -742,6 +739,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const file = fileInput.files[0];
 
     if (!text && !file) return;
+
+    // Показываем сообщение сразу (оптимистичный UI)
+    const tempMessage = {
+      id: 'temp-' + Date.now(),
+      userId: currentUser.id,
+      text: text,
+      file: file ? URL.createObjectURL(file) : null,
+      time: new Date().toLocaleTimeString(),
+      timestamp: Date.now(),
+      read: false,
+      status: 'sending'
+    };
+
+    // Добавляем сообщение в UI сразу
+    addMessageToDOM(tempMessage);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
     const formData = new FormData();
     formData.append("chatId", currentChat.id);
@@ -764,10 +777,29 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.success) {
         messageInput.value = "";
         fileInput.value = "";
+        
+        // Удаляем временное сообщение
+        const tempMsg = document.querySelector(`[data-id="${tempMessage.id}"]`);
+        if (tempMsg) {
+          tempMsg.remove();
+        }
+        
+        // Сервер отправит сообщение через сокет
+        // Новое сообщение добавится в обработчике socket.on("newMessage")
       }
     } catch (err) {
       console.error("Error sending message:", err);
       alert("Ошибка при отправке");
+      
+      // Помечаем временное сообщение как ошибочное
+      const tempMsg = document.querySelector(`[data-id="${tempMessage.id}"]`);
+      if (tempMsg) {
+        tempMsg.classList.add('error');
+        const statusSpan = tempMsg.querySelector('.message-status');
+        if (statusSpan) {
+          statusSpan.textContent = '❌';
+        }
+      }
     } finally {
       if (sendBtn) {
         sendBtn.classList.remove('loading');
@@ -923,21 +955,49 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============== SOCKET EVENTS ==============
 
   socket.on("newMessage", (data) => {
+    console.log("New message received:", data);
+    
+    // Добавляем сообщение в текущий чат
     if (data.chatId === currentChat?.id) {
       addMessageToDOM(data.message);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       socket.emit("message read", { chatId: currentChat.id, userId: currentUser.id });
     }
-    loadChats();
+    
+    // Обновляем список чатов (для последнего сообщения)
+    // Но не перезагружаем страницу
+    const chatIndex = chats.findIndex(c => c.id === data.chatId);
+    if (chatIndex !== -1) {
+      chats[chatIndex].messages.push(data.message);
+      chats[chatIndex].lastMessage = data.message;
+      
+      // Перемещаем чат вверх
+      const chat = chats.splice(chatIndex, 1)[0];
+      chats.unshift(chat);
+      
+      renderChats(chats);
+    }
   });
 
   socket.on("messages read", (data) => {
+    console.log("Messages read:", data);
+    
     if (data.chatId === currentChat?.id) {
       const messageElements = messagesDiv.querySelectorAll(".message");
       messageElements.forEach(el => {
         const statusSpan = el.querySelector(".message-status");
         if (statusSpan) {
           statusSpan.textContent = "✓✓";
+        }
+      });
+    }
+    
+    // Обновляем статусы в списке чатов
+    const chatIndex = chats.findIndex(c => c.id === data.chatId);
+    if (chatIndex !== -1) {
+      chats[chatIndex].messages.forEach(msg => {
+        if (msg.userId !== currentUser.id) {
+          msg.read = true;
         }
       });
     }
@@ -955,6 +1015,9 @@ document.addEventListener("DOMContentLoaded", () => {
         chatStatus.innerHTML = data.online ? '<span class="online-dot"></span> online' : 'не в сети';
       }
     }
+    
+    // Обновляем статусы в списке чатов
+    renderChats(chats);
   });
 
   // ============== EVENT LISTENERS ==============
@@ -990,7 +1053,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Добавляем стиль для загрузки
+  // Добавляем стиль для загрузки и ошибок
   const style = document.createElement('style');
   style.textContent = `
     .send-btn.loading {
@@ -999,6 +1062,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     .send-btn.loading svg {
       animation: spin 1s linear infinite;
+    }
+    .message.error .message-bubble {
+      background: linear-gradient(135deg, #991b1b, #7f1d1d, #991b1b) !important;
     }
     @keyframes spin {
       from { transform: rotate(0deg); }

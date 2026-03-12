@@ -309,11 +309,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       userSearchResults.innerHTML = filteredUsers.map(user => `
         <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
-          <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}" style="width: 40px; height: 40px; border-radius: 10px; object-fit: cover;">
+          <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
           <div class="user-info">
-            <div class="user-name" style="font-weight: 600; color: white; margin-bottom: 4px;">${user.username}</div>
-            <div class="user-status" style="font-size: 12px; display: flex; align-items: center; gap: 5px;">
-              <span class="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: ${user.online ? '#22c55e' : '#6b7280'};"></span>
+            <div class="user-name">${user.username}</div>
+            <div class="user-status">
+              <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
               <span style="color: ${user.online ? '#22c55e' : '#9ca3af'};">
                 ${user.online ? 'в сети' : 'не в сети'}
               </span>
@@ -356,7 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ============== СОЗДАНИЕ ЧАТА - ИСПРАВЛЕНО ==============
+  // ============== СОЗДАНИЕ ЧАТА ==============
   
   async function handleAddUser() {
     console.log("handleAddUser called");
@@ -405,7 +405,6 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Existing chat found:", existingChat);
       addUserModal.classList.add("hidden");
       
-      // Добавляем информацию о другом пользователе если её нет
       if (!existingChat.otherUser) {
         existingChat.otherUser = {
           id: user.id,
@@ -441,7 +440,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.success && data.chat) {
         console.log("Chat created successfully:", data.chat);
         
-        // Создаем новый чат с правильной структурой
         const newChat = {
           ...data.chat,
           otherUser: {
@@ -453,7 +451,6 @@ document.addEventListener("DOMContentLoaded", () => {
           messages: data.chat.messages || []
         };
         
-        // Добавляем в начало списка
         chats = [newChat, ...chats];
         renderChats(chats);
         
@@ -469,27 +466,19 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (confirmAddUser) {
-    // Удаляем все старые обработчики
-    confirmAddUser.replaceWith(confirmAddUser.cloneNode(true));
+    confirmAddUser.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Confirm add user clicked");
+      await handleAddUser();
+    });
     
-    // Получаем новый элемент
-    const newConfirmAddUser = document.getElementById("confirmAddUser");
-    
-    if (newConfirmAddUser) {
-      newConfirmAddUser.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log("Confirm add user clicked");
-        await handleAddUser();
-      });
-      
-      newConfirmAddUser.addEventListener('touchstart', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log("Confirm add user touched");
-        await handleAddUser();
-      }, { passive: false });
-    }
+    confirmAddUser.addEventListener('touchstart', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log("Confirm add user touched");
+      await handleAddUser();
+    }, { passive: false });
   }
 
   // ============== REGISTER & LOGIN ==============
@@ -758,7 +747,7 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.appendChild(messageDiv);
   }
 
-  // ============== SEND MESSAGE ==============
+  // ============== SEND MESSAGE - ИСПРАВЛЕНО ==============
 
   async function sendMessage(e) {
     e.preventDefault();
@@ -774,18 +763,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!text && !file) return;
 
-    // Показываем сообщение сразу
+    // Временно показываем сообщение
+    const tempId = 'temp-' + Date.now();
     const tempMessage = {
-      id: 'temp-' + Date.now(),
+      id: tempId,
       userId: currentUser.id,
       text: text,
       file: file ? URL.createObjectURL(file) : null,
       time: new Date().toLocaleTimeString(),
       timestamp: Date.now(),
-      read: false,
-      status: 'sending'
+      read: false
     };
 
+    // Добавляем сообщение в UI сразу
     addMessageToDOM(tempMessage);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
@@ -811,22 +801,23 @@ document.addEventListener("DOMContentLoaded", () => {
         messageInput.value = "";
         fileInput.value = "";
         
-        const tempMsg = document.querySelector(`[data-id="${tempMessage.id}"]`);
+        // Удаляем временное сообщение
+        const tempMsg = document.querySelector(`[data-id="${tempId}"]`);
         if (tempMsg) {
           tempMsg.remove();
         }
+        
+        // Добавляем сообщение через сокет (сервер отправит)
+        console.log("Message sent successfully");
       }
     } catch (err) {
       console.error("Error sending message:", err);
       alert("Ошибка при отправке");
       
-      const tempMsg = document.querySelector(`[data-id="${tempMessage.id}"]`);
+      // Помечаем временное сообщение как ошибочное
+      const tempMsg = document.querySelector(`[data-id="${tempId}"]`);
       if (tempMsg) {
         tempMsg.classList.add('error');
-        const statusSpan = tempMsg.querySelector('.message-status');
-        if (statusSpan) {
-          statusSpan.textContent = '❌';
-        }
       }
     } finally {
       if (sendBtn) {
@@ -980,22 +971,25 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== SOCKET EVENTS ==============
+  // ============== SOCKET EVENTS - ИСПРАВЛЕНО ==============
 
   socket.on("newMessage", (data) => {
     console.log("New message received:", data);
     
+    // Добавляем сообщение в текущий чат если он открыт
     if (data.chatId === currentChat?.id) {
       addMessageToDOM(data.message);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       socket.emit("message read", { chatId: currentChat.id, userId: currentUser.id });
     }
     
+    // Обновляем список чатов (для последнего сообщения)
     const chatIndex = chats.findIndex(c => c.id === data.chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].messages.push(data.message);
       chats[chatIndex].lastMessage = data.message;
       
+      // Перемещаем чат вверх
       const chat = chats.splice(chatIndex, 1)[0];
       chats.unshift(chat);
       
@@ -1087,22 +1081,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     .message.error .message-bubble {
       background: linear-gradient(135deg, #991b1b, #7f1d1d, #991b1b) !important;
-    }
-    .user-search-item {
-      padding: 12px;
-      margin: 8px 0;
-      border-radius: 10px;
-      background: #1f2937;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      transition: all 0.2s;
-      border: 1px solid transparent;
-    }
-    .user-search-item:hover {
-      background: #2d3748;
-      border-color: #3B82F6;
     }
     @keyframes spin {
       from { transform: rotate(0deg); }

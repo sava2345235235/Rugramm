@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== ADD USER - ИСПРАВЛЕН ПОИСК ==============
+  // ============== ADD USER ==============
   
   function showAddUserModal() {
     console.log("Opening add user modal");
@@ -249,12 +249,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }, { passive: false });
   }
 
-  // ============== ПОИСК ПОЛЬЗОВАТЕЛЕЙ - ИСПРАВЛЕНО ==============
+  // ============== ПОИСК ПОЛЬЗОВАТЕЛЕЙ ==============
   
   if (addUsernameInput) {
     let searchUserTimeout;
     
-    // Обработчик ввода
     addUsernameInput.addEventListener("input", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -271,31 +270,26 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Показываем индикатор загрузки
       if (userSearchResults) {
         userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af;">🔍 Поиск...</div>';
       }
 
-      // Делаем поиск с задержкой
       searchUserTimeout = setTimeout(() => {
         searchUsers(query);
       }, 300);
     });
 
-    // Обработчик для мобильных
     addUsernameInput.addEventListener("touchstart", (e) => {
       e.stopPropagation();
     });
   }
 
-  // Функция поиска пользователей
   async function searchUsers(query) {
     const searchTerm = query.startsWith('@') ? query.substring(1) : query;
     
     try {
       console.log("Searching for:", searchTerm);
       
-      // Используем правильный эндпоинт
       const res = await fetch(`/search/users?q=${encodeURIComponent(searchTerm)}`);
       
       if (!res.ok) {
@@ -313,7 +307,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Отображаем найденных пользователей
       userSearchResults.innerHTML = filteredUsers.map(user => `
         <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
           <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}" style="width: 40px; height: 40px; border-radius: 10px; object-fit: cover;">
@@ -329,7 +322,6 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `).join('');
 
-      // Добавляем обработчики клика на найденных пользователей
       document.querySelectorAll('.user-search-item').forEach(item => {
         item.addEventListener('click', (e) => {
           e.preventDefault();
@@ -364,7 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // ============== CREATE CHAT ==============
+  // ============== СОЗДАНИЕ ЧАТА - ИСПРАВЛЕНО ==============
   
   async function handleAddUser() {
     console.log("handleAddUser called");
@@ -405,13 +397,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Проверяем существующий чат
     const existingChat = chats.find(chat => {
-      if (!chat.members) return false;
+      if (!chat.members || !Array.isArray(chat.members)) return false;
       return chat.members.includes(currentUser.id) && chat.members.includes(user.id);
     });
 
     if (existingChat) {
       console.log("Existing chat found:", existingChat);
       addUserModal.classList.add("hidden");
+      
+      // Добавляем информацию о другом пользователе если её нет
+      if (!existingChat.otherUser) {
+        existingChat.otherUser = {
+          id: user.id,
+          username: user.username,
+          avatar: user.avatar,
+          online: user.online
+        };
+      }
+      
       await openChat(existingChat);
       return;
     }
@@ -420,8 +423,12 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Creating new chat with:", user.id);
       const res = await fetch("/createChat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ members: [currentUser.id, user.id] })
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ 
+          members: [currentUser.id, user.id] 
+        })
       });
 
       if (!res.ok) {
@@ -434,18 +441,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.success && data.chat) {
         console.log("Chat created successfully:", data.chat);
         
-        // Добавляем созданный чат в список
-        const newChat = data.chat;
-        
-        // Добавляем информацию о другом пользователе
-        newChat.otherUser = {
-          id: user.id,
-          username: user.username,
-          avatar: user.avatar,
-          online: user.online
+        // Создаем новый чат с правильной структурой
+        const newChat = {
+          ...data.chat,
+          otherUser: {
+            id: user.id,
+            username: user.username,
+            avatar: user.avatar,
+            online: user.online
+          },
+          messages: data.chat.messages || []
         };
         
-        chats.unshift(newChat);
+        // Добавляем в начало списка
+        chats = [newChat, ...chats];
         renderChats(chats);
         
         addUserModal.classList.add("hidden");
@@ -460,21 +469,27 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (confirmAddUser) {
-    confirmAddUser.onclick = null;
+    // Удаляем все старые обработчики
+    confirmAddUser.replaceWith(confirmAddUser.cloneNode(true));
     
-    confirmAddUser.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log("Confirm add user clicked");
-      await handleAddUser();
-    });
+    // Получаем новый элемент
+    const newConfirmAddUser = document.getElementById("confirmAddUser");
     
-    confirmAddUser.addEventListener('touchstart', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log("Confirm add user touched");
-      await handleAddUser();
-    }, { passive: false });
+    if (newConfirmAddUser) {
+      newConfirmAddUser.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Confirm add user clicked");
+        await handleAddUser();
+      });
+      
+      newConfirmAddUser.addEventListener('touchstart', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("Confirm add user touched");
+        await handleAddUser();
+      }, { passive: false });
+    }
   }
 
   // ============== REGISTER & LOGIN ==============

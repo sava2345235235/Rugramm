@@ -205,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  // ============== ADD USER ==============
+  // ============== ADD USER - ИСПРАВЛЕН ПОИСК ==============
   
   function showAddUserModal() {
     console.log("Opening add user modal");
@@ -249,9 +249,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }, { passive: false });
   }
 
-  // Search users as you type
+  // ============== ПОИСК ПОЛЬЗОВАТЕЛЕЙ - ИСПРАВЛЕНО ==============
+  
   if (addUsernameInput) {
     let searchUserTimeout;
+    
+    // Обработчик ввода
     addUsernameInput.addEventListener("input", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -268,75 +271,91 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // Показываем индикатор загрузки
       if (userSearchResults) {
         userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af;">🔍 Поиск...</div>';
       }
 
+      // Делаем поиск с задержкой
       searchUserTimeout = setTimeout(() => {
         searchUsers(query);
       }, 300);
     });
+
+    // Обработчик для мобильных
+    addUsernameInput.addEventListener("touchstart", (e) => {
+      e.stopPropagation();
+    });
   }
 
+  // Функция поиска пользователей
   async function searchUsers(query) {
     const searchTerm = query.startsWith('@') ? query.substring(1) : query;
     
     try {
       console.log("Searching for:", searchTerm);
+      
+      // Используем правильный эндпоинт
       const res = await fetch(`/search/users?q=${encodeURIComponent(searchTerm)}`);
+      
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
       const filteredUsers = await res.json();
       
       console.log("Found users:", filteredUsers);
 
+      if (!userSearchResults) return;
+
       if (filteredUsers.length === 0) {
-        if (userSearchResults) {
-          userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af;">😕 Пользователи не найдены</div>';
-        }
+        userSearchResults.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af;">😕 Пользователи не найдены</div>';
         return;
       }
 
-      if (userSearchResults) {
-        userSearchResults.innerHTML = filteredUsers.map(user => `
-          <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
-            <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
-            <div class="user-info">
-              <div class="user-name">${user.username}</div>
-              <div class="user-status">
-                <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
-                <span style="color: ${user.online ? '#22c55e' : '#9ca3af'};">
-                  ${user.online ? 'в сети' : 'не в сети'}
-                </span>
-              </div>
+      // Отображаем найденных пользователей
+      userSearchResults.innerHTML = filteredUsers.map(user => `
+        <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
+          <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}" style="width: 40px; height: 40px; border-radius: 10px; object-fit: cover;">
+          <div class="user-info">
+            <div class="user-name" style="font-weight: 600; color: white; margin-bottom: 4px;">${user.username}</div>
+            <div class="user-status" style="font-size: 12px; display: flex; align-items: center; gap: 5px;">
+              <span class="status-dot" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: ${user.online ? '#22c55e' : '#6b7280'};"></span>
+              <span style="color: ${user.online ? '#22c55e' : '#9ca3af'};">
+                ${user.online ? 'в сети' : 'не в сети'}
+              </span>
             </div>
           </div>
-        `).join('');
+        </div>
+      `).join('');
 
-        document.querySelectorAll('.user-search-item').forEach(item => {
-          item.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const username = item.dataset.username;
-            if (addUsernameInput) {
-              addUsernameInput.value = '@' + username;
-            }
-            if (userSearchResults) {
-              userSearchResults.innerHTML = '';
-            }
-          });
-          
-          item.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const username = item.dataset.username;
-            if (addUsernameInput) {
-              addUsernameInput.value = '@' + username;
-            }
-            if (userSearchResults) {
-              userSearchResults.innerHTML = '';
-            }
-          }, { passive: false });
+      // Добавляем обработчики клика на найденных пользователей
+      document.querySelectorAll('.user-search-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const username = item.dataset.username;
+          if (addUsernameInput) {
+            addUsernameInput.value = '@' + username;
+          }
+          if (userSearchResults) {
+            userSearchResults.innerHTML = '';
+          }
         });
-      }
+        
+        item.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const username = item.dataset.username;
+          if (addUsernameInput) {
+            addUsernameInput.value = '@' + username;
+          }
+          if (userSearchResults) {
+            userSearchResults.innerHTML = '';
+          }
+        }, { passive: false });
+      });
+      
     } catch (err) {
       console.error("Error searching users:", err);
       if (userSearchResults) {
@@ -724,7 +743,7 @@ document.addEventListener("DOMContentLoaded", () => {
     messagesDiv.appendChild(messageDiv);
   }
 
-  // ============== SEND MESSAGE - ИСПРАВЛЕНО (реальное время) ==============
+  // ============== SEND MESSAGE ==============
 
   async function sendMessage(e) {
     e.preventDefault();
@@ -740,7 +759,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!text && !file) return;
 
-    // Показываем сообщение сразу (оптимистичный UI)
+    // Показываем сообщение сразу
     const tempMessage = {
       id: 'temp-' + Date.now(),
       userId: currentUser.id,
@@ -752,7 +771,6 @@ document.addEventListener("DOMContentLoaded", () => {
       status: 'sending'
     };
 
-    // Добавляем сообщение в UI сразу
     addMessageToDOM(tempMessage);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 
@@ -778,20 +796,15 @@ document.addEventListener("DOMContentLoaded", () => {
         messageInput.value = "";
         fileInput.value = "";
         
-        // Удаляем временное сообщение
         const tempMsg = document.querySelector(`[data-id="${tempMessage.id}"]`);
         if (tempMsg) {
           tempMsg.remove();
         }
-        
-        // Сервер отправит сообщение через сокет
-        // Новое сообщение добавится в обработчике socket.on("newMessage")
       }
     } catch (err) {
       console.error("Error sending message:", err);
       alert("Ошибка при отправке");
       
-      // Помечаем временное сообщение как ошибочное
       const tempMsg = document.querySelector(`[data-id="${tempMessage.id}"]`);
       if (tempMsg) {
         tempMsg.classList.add('error');
@@ -899,7 +912,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // ============== SEARCH ==============
+  // ============== SEARCH CHATS ==============
 
   if (searchInput) {
     let searchTimeout;
@@ -957,21 +970,17 @@ document.addEventListener("DOMContentLoaded", () => {
   socket.on("newMessage", (data) => {
     console.log("New message received:", data);
     
-    // Добавляем сообщение в текущий чат
     if (data.chatId === currentChat?.id) {
       addMessageToDOM(data.message);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
       socket.emit("message read", { chatId: currentChat.id, userId: currentUser.id });
     }
     
-    // Обновляем список чатов (для последнего сообщения)
-    // Но не перезагружаем страницу
     const chatIndex = chats.findIndex(c => c.id === data.chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].messages.push(data.message);
       chats[chatIndex].lastMessage = data.message;
       
-      // Перемещаем чат вверх
       const chat = chats.splice(chatIndex, 1)[0];
       chats.unshift(chat);
       
@@ -992,7 +1001,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
     
-    // Обновляем статусы в списке чатов
     const chatIndex = chats.findIndex(c => c.id === data.chatId);
     if (chatIndex !== -1) {
       chats[chatIndex].messages.forEach(msg => {
@@ -1016,7 +1024,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     
-    // Обновляем статусы в списке чатов
     renderChats(chats);
   });
 
@@ -1053,7 +1060,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Добавляем стиль для загрузки и ошибок
+  // Стили
   const style = document.createElement('style');
   style.textContent = `
     .send-btn.loading {
@@ -1065,6 +1072,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     .message.error .message-bubble {
       background: linear-gradient(135deg, #991b1b, #7f1d1d, #991b1b) !important;
+    }
+    .user-search-item {
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 10px;
+      background: #1f2937;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s;
+      border: 1px solid transparent;
+    }
+    .user-search-item:hover {
+      background: #2d3748;
+      border-color: #3B82F6;
     }
     @keyframes spin {
       from { transform: rotate(0deg); }

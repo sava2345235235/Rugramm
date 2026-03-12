@@ -41,7 +41,12 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ storage });
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // База данных
 let users = [];
@@ -86,7 +91,8 @@ app.post("/register", (req, res) => {
     username,
     password,
     avatar: "/uploads/default-avatar.png",
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    lastSeen: new Date().toISOString()
   };
 
   users.push(user);
@@ -96,7 +102,8 @@ app.post("/register", (req, res) => {
     success: true, 
     id: user.id,
     username: user.username,
-    avatar: user.avatar
+    avatar: user.avatar,
+    createdAt: user.createdAt
   });
 });
 
@@ -110,11 +117,15 @@ app.post("/login", (req, res) => {
     return res.json({ error: "Неверный логин или пароль" });
   }
 
+  user.lastSeen = new Date().toISOString();
+  saveData();
+
   res.json({
     success: true,
     id: user.id,
     username: user.username,
-    avatar: user.avatar
+    avatar: user.avatar,
+    createdAt: user.createdAt
   });
 });
 
@@ -125,21 +136,49 @@ app.get("/users", (req, res) => {
       id: u.id,
       username: u.username,
       avatar: u.avatar,
-      online: !!onlineUsers[u.id]
+      online: !!onlineUsers[u.id],
+      lastSeen: u.lastSeen
     }))
   );
 });
 
-// Поиск пользователей
+// Получить информацию о пользователе
+app.get("/user/:userId", (req, res) => {
+  const userId = req.params.userId;
+  const user = users.find(u => u.id === userId);
+
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  res.json({
+    id: user.id,
+    username: user.username,
+    avatar: user.avatar,
+    online: !!onlineUsers[user.id],
+    lastSeen: user.lastSeen,
+    createdAt: user.createdAt
+  });
+});
+
+// ============== ПОИСК ПОЛЬЗОВАТЕЛЕЙ - ИСПРАВЛЕНО ==============
 app.get("/search/users", (req, res) => {
   const { q } = req.query;
+  
+  console.log("🔍 Search request for:", q);
+  console.log("All users:", users.map(u => u.username));
   
   if (!q || q.length < 1) {
     return res.json([]);
   }
 
+  const searchTerm = q.toLowerCase();
+  
   const searchResults = users
-    .filter(u => u.username.toLowerCase().includes(q.toLowerCase()))
+    .filter(u => {
+      // Поиск по username (без учета регистра)
+      return u.username.toLowerCase().includes(searchTerm);
+    })
     .map(u => ({
       id: u.id,
       username: u.username,
@@ -148,6 +187,7 @@ app.get("/search/users", (req, res) => {
     }))
     .slice(0, 20);
 
+  console.log("✅ Search results:", searchResults);
   res.json(searchResults);
 });
 
@@ -159,7 +199,9 @@ app.post("/createChat", (req, res) => {
     return res.json({ error: "Need at least 2 members" });
   }
 
+  // Проверяем, существует ли уже такой чат
   let chat = chats.find(c => 
+    c.members && 
     c.members.includes(members[0]) && 
     c.members.includes(members[1]) &&
     c.members.length === 2
@@ -170,7 +212,9 @@ app.post("/createChat", (req, res) => {
       id: uuidv4(),
       members,
       messages: [],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      pinned: false,
+      lastMessage: null
     };
     chats.push(chat);
     saveData();
@@ -206,6 +250,7 @@ app.post("/sendMessage", upload.single("file"), (req, res) => {
     userId,
     text: text || "",
     file: req.file ? "/uploads/" + req.file.filename : null,
+    fileType: req.file ? req.file.mimetype : null,
     time: new Date().toLocaleTimeString(),
     timestamp: Date.now(),
     read: false,
@@ -213,8 +258,10 @@ app.post("/sendMessage", upload.single("file"), (req, res) => {
   };
 
   chat.messages.push(message);
+  chat.lastMessage = message;
   saveData();
 
+  // Отправляем сообщение всем в комнате чата
   io.to(chatId).emit("newMessage", { 
     chatId, 
     message,
@@ -285,6 +332,74 @@ app.post("/uploadAvatar", upload.single("avatar"), (req, res) => {
   res.json({ success: true, avatarUrl });
 });
 
+// Закрепить чат
+app.post("/pinChat", (req, res) => {
+  const { chatId, userId, pin } = req.body;
+
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat || !chat.members.includes(userId)) {
+    return res.json({ error: "Chat not found or access denied" });
+  }
+
+  chat.pinned = pin;
+  saveData();
+
+  res.json({ success: true, pinned: pin });
+});
+
+// Удалить сообщение
+app.post("/deleteMessage", (req, res) => {
+  const { messageId, chatId, userId } = req.body;
+
+  const chat = chats.find(c => c.id === chatId);
+  if (!chat) {
+    return res.json({ error: "Chat not found" });
+  }
+
+  const messageIndex = chat.messages.findIndex(m => m.id === messageId);
+  if (messageIndex === -1) {
+    return res.json({ error: "Message not found" });
+  }
+
+  const message = chat.messages[messageIndex];
+  if (message.userId !== userId) {
+    return res.json({ error: "Not authorized" });
+  }
+
+  chat.messages[messageIndex] = {
+    ...message,
+    deleted: true,
+    text: "Сообщение удалено",
+    file: null
+  };
+
+  saveData();
+  io.to(chatId).emit("messageDeleted", { chatId, messageId });
+
+  res.json({ success: true });
+});
+
+// Health check
+app.get("/health", (req, res) => {
+  res.status(200).json({ 
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    users: users.length,
+    chats: chats.length,
+    online: Object.keys(onlineUsers).length
+  });
+});
+
+// Статистика
+app.get("/stats", (req, res) => {
+  res.json({
+    totalUsers: users.length,
+    totalChats: chats.length,
+    totalMessages: chats.reduce((acc, chat) => acc + chat.messages.length, 0),
+    onlineUsers: Object.keys(onlineUsers).length
+  });
+});
+
 // ============== Socket.IO ==============
 
 io.on("connection", (socket) => {
@@ -294,6 +409,14 @@ io.on("connection", (socket) => {
     socket.userId = userId;
     onlineUsers[userId] = true;
     
+    // Обновляем время последнего посещения
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      user.lastSeen = new Date().toISOString();
+      saveData();
+    }
+    
+    // Присоединяемся к комнатам чатов пользователя
     const userChats = chats.filter(c => c.members.includes(userId));
     userChats.forEach(chat => {
       socket.join(chat.id);
@@ -326,8 +449,14 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("typing", (data) => {
+    const { chatId, userId, isTyping } = data;
+    socket.to(chatId).emit("user typing", { userId, isTyping });
+  });
+
   // Call events
   socket.on("call-offer", (data) => {
+    console.log("Call offer from", socket.userId, "to", data.targetId);
     socket.to(data.targetId).emit("call-offer", {
       ...data,
       callerId: socket.userId
@@ -335,41 +464,63 @@ io.on("connection", (socket) => {
   });
 
   socket.on("call-answer", (data) => {
+    console.log("Call answer from", socket.userId, "to", data.targetId);
     socket.to(data.targetId).emit("call-answer", data);
   });
 
   socket.on("call-ice-candidate", (data) => {
+    console.log("ICE candidate from", socket.userId, "to", data.targetId);
     socket.to(data.targetId).emit("call-ice-candidate", data);
   });
 
   socket.on("call-reject", (data) => {
+    console.log("Call reject from", socket.userId, "to", data.targetId);
     socket.to(data.targetId).emit("call-reject");
   });
 
   socket.on("call-end", (data) => {
+    console.log("Call end from", socket.userId, "to", data.targetId);
     socket.to(data.targetId).emit("call-end");
   });
 
   socket.on("disconnect", () => {
     if (socket.userId) {
       delete onlineUsers[socket.userId];
+      
+      // Обновляем время последнего посещения
+      const user = users.find(u => u.id === socket.userId);
+      if (user) {
+        user.lastSeen = new Date().toISOString();
+        saveData();
+      }
+      
       io.emit("onlineUpdate", { userId: socket.userId, online: false });
     }
     console.log("Disconnected:", socket.id);
   });
 });
 
-// Health check
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
-});
+// Создаем дефолтный аватар, если его нет
+const defaultAvatarPath = path.join(__dirname, "uploads", "default-avatar.png");
+if (!fs.existsSync(defaultAvatarPath)) {
+  console.log("Default avatar not found. Please add default-avatar.png to uploads folder.");
+}
 
 // Для SPA - отдаем index.html на все маршруты
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Обработка ошибок
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: "Something went wrong!" });
+});
+
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📱 Local: http://localhost:${PORT}`);
 });
+
+module.exports = app;

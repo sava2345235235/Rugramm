@@ -1,526 +1,359 @@
-const express = require("express");
-const fs = require("fs");
-const multer = require("multer");
-const { v4: uuidv4 } = require("uuid");
-const path = require("path");
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
+const Database = require('better-sqlite3');
+
+// Database setup (SQLite with better-sqlite3)
+const db = new Database('./data/chat.db');
+
+// Initialize database tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    avatar TEXT DEFAULT 'default.png',
+    status TEXT DEFAULT 'offline',
+    last_seen TEXT DEFAULT (datetime('now'))
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chats (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    type TEXT DEFAULT 'private',
+    created_at TEXT DEFAULT (datetime('now')),
+    created_by TEXT,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS chat_members (
+    chat_id TEXT,
+    user_id TEXT,
+    role TEXT DEFAULT 'member',
+    pinned INTEGER DEFAULT 0,
+    PRIMARY KEY (chat_id, user_id),
+    FOREIGN KEY (chat_id) REFERENCES chats(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  )
+`);
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    content TEXT,
+    file_url TEXT,
+    file_type TEXT,
+    message_type TEXT DEFAULT 'text',
+    created_at TEXT DEFAULT (datetime('now')),
+    edited INTEGER DEFAULT 0,
+    deleted INTEGER DEFAULT 0,
+    FOREIGN KEY (chat_id) REFERENCES chats(id),
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+  )
+`);
 
 const app = express();
-const http = require("http").createServer(app);
-const io = require("socket.io")(http, {
+const server = http.createServer(app);
+const io = new Server(server, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: '*',
+    methods: ['GET', 'POST']
   }
 });
 
-// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(express.static('public'));
+app.use('/uploads', express.static('uploads'));
 
-// Создаем папки, если их нет
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-}
-
-if (!fs.existsSync("uploads/avatars")) {
-  fs.mkdirSync("uploads/avatars", { recursive: true });
-}
-
-// Настройка multer для загрузки файлов
+// File upload configuration
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    if (file.fieldname === "avatar") {
-      cb(null, "uploads/avatars/");
-    } else {
-      cb(null, "uploads/");
-    }
+    const folder = file.mimetype.startsWith('image/') ? 'uploads/avatars' : 'uploads/files';
+    fs.mkdirSync(folder, { recursive: true });
+    cb(null, folder);
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + "_" + file.originalname);
+    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Online users tracking
+const onlineUsers = new Map(); // socketId -> userId
+const userSockets = new Map(); // userId -> Set of socketIds
+
+// Auth middleware for sockets
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  if (!token) return next(new Error('Authentication required'));
+  
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(token);
+    if (!user) return next(new Error('Invalid token'));
+    socket.user = user;
+    next();
+  } catch (err) {
+    next(err);
   }
 });
 
-const upload = multer({ 
-  storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+io.on('connection', (socket) => {
+  const user = socket.user;
+  console.log(`User connected: ${user.username} (${socket.id})`);
+
+  // Update user status to online
+  onlineUsers.set(socket.id, user.id);
+  if (!userSockets.has(user.id)) {
+    userSockets.set(user.id, new Set());
   }
+  userSockets.get(user.id).add(socket.id);
+  
+  db.prepare('UPDATE users SET status = ?, last_seen = datetime(\'now\') WHERE id = ?').run('online', user.id);
+  
+  // Notify contacts about online status
+  socket.broadcast.emit('user_status', { userId: user.id, status: 'online' });
+
+  // Join user's personal room for direct messages
+  socket.join(`user:${user.id}`);
+
+  // Get user's chats
+  socket.on('get_chats', () => {
+    const now = new Date().toISOString();
+    const chats = db.prepare(`
+      SELECT c.*, 
+        (SELECT m.content FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
+        (SELECT m.created_at FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_time,
+        (SELECT COUNT(*) FROM messages m WHERE m.chat_id = c.id AND m.created_at > ? AND m.sender_id != ?) as unread_count
+      FROM chats c
+      JOIN chat_members cm ON c.id = cm.chat_id
+      WHERE cm.user_id = ?
+      ORDER BY last_message_time DESC
+    `).all(now, user.id, user.id);
+    
+    // Get members for each chat
+    chats.forEach(chat => {
+      const members = db.prepare(`
+        SELECT u.id, u.username, u.avatar, u.status, cm.role, cm.pinned
+        FROM users u
+        JOIN chat_members cm ON u.id = cm.user_id
+        WHERE cm.chat_id = ?
+      `).all(chat.id);
+      chat.members = members;
+    });
+    
+    socket.emit('chats_list', chats);
+  });
+
+  // Get messages for a chat
+  socket.on('get_messages', (chatId) => {
+    const messages = db.prepare(`
+      SELECT m.*, u.username, u.avatar
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.chat_id = ? AND m.deleted = 0
+      ORDER BY m.created_at ASC
+      LIMIT 50
+    `).all(chatId);
+    socket.emit('messages_history', messages);
+  });
+
+  // Send message
+  socket.on('send_message', (data) => {
+    const { chatId, content, fileUrl, fileType, messageType = 'text' } = data;
+    const messageId = uuidv4();
+    const now = new Date().toISOString();
+    
+    db.prepare(`
+      INSERT INTO messages (id, chat_id, sender_id, content, file_url, file_type, message_type, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(messageId, chatId, user.id, content, fileUrl, fileType, messageType, now);
+    
+    const sender = db.prepare('SELECT username, avatar FROM users WHERE id = ?').get(user.id);
+    
+    const message = {
+      id: messageId,
+      chat_id: chatId,
+      sender_id: user.id,
+      username: sender.username,
+      avatar: sender.avatar,
+      content,
+      file_url: fileUrl,
+      file_type: fileType,
+      message_type: messageType,
+      created_at: now
+    };
+    
+    // Send to all chat members
+    const members = db.prepare('SELECT user_id FROM chat_members WHERE chat_id = ?').all(chatId);
+    members.forEach(member => {
+      const sockets = userSockets.get(member.user_id);
+      if (sockets) {
+        sockets.forEach(socketId => {
+          io.to(socketId).emit('new_message', message);
+        });
+      }
+    });
+  });
+
+  // Typing indicator
+  socket.on('typing', (data) => {
+    const { chatId, isTyping } = data;
+    socket.to(`chat:${chatId}`).emit('user_typing', { userId: user.id, username: user.username, isTyping });
+  });
+
+  // Create private chat
+  socket.on('create_private_chat', (targetUserId) => {
+    // Check if chat already exists
+    const existingChat = db.prepare(`
+      SELECT c.id FROM chats c
+      JOIN chat_members cm1 ON c.id = cm1.chat_id AND cm1.user_id = ?
+      JOIN chat_members cm2 ON c.id = cm2.chat_id AND cm2.user_id = ?
+      WHERE c.type = 'private'
+    `).get(user.id, targetUserId);
+    
+    if (existingChat) {
+      socket.emit('chat_created', { chatId: existingChat.id, isNew: false });
+      return;
+    }
+    
+    const chatId = uuidv4();
+    const now = new Date().toISOString();
+    
+    db.prepare('INSERT INTO chats (id, type, created_by, created_at) VALUES (?, ?, ?, ?)').run(chatId, 'private', user.id, now);
+    db.prepare('INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)').run(chatId, user.id);
+    db.prepare('INSERT INTO chat_members (chat_id, user_id) VALUES (?, ?)').run(chatId, targetUserId);
+    
+    socket.emit('chat_created', { chatId, isNew: true });
+    
+    // Notify target user
+    const targetSockets = userSockets.get(targetUserId);
+    if (targetSockets) {
+      targetSockets.forEach(socketId => {
+        io.to(socketId).emit('new_chat_invitation', { chatId, from: user.id });
+      });
+    }
+  });
+
+  // Search users
+  socket.on('search_users', (query) => {
+    const users = db.prepare(`
+      SELECT id, username, avatar, status FROM users
+      WHERE username LIKE ? AND id != ?
+      LIMIT 10
+    `).all(`%${query}%`, user.id);
+    socket.emit('search_results', users);
+  });
+
+  // Disconnect
+  socket.on('disconnect', () => {
+    console.log(`User disconnected: ${user.username} (${socket.id})`);
+    onlineUsers.delete(socket.id);
+    
+    const sockets = userSockets.get(user.id);
+    if (sockets) {
+      sockets.delete(socket.id);
+      if (sockets.size === 0) {
+        userSockets.delete(user.id);
+        db.prepare('UPDATE users SET status = ?, last_seen = datetime(\'now\') WHERE id = ?').run('offline', user.id);
+        socket.broadcast.emit('user_status', { userId: user.id, status: 'offline' });
+      }
+    }
+  });
 });
 
-// База данных
-let users = [];
-let chats = [];
-let onlineUsers = {};
+// REST API endpoints
 
-const DATA_FILE = "data.json";
-if (fs.existsSync(DATA_FILE)) {
-  try {
-    const data = JSON.parse(fs.readFileSync(DATA_FILE));
-    users = data.users || [];
-    chats = data.chats || [];
-  } catch (err) {
-    console.error("Error loading data:", err);
-  }
-}
-
-function saveData() {
-  try {
-    fs.writeFileSync(DATA_FILE, JSON.stringify({ users, chats }, null, 2));
-  } catch (err) {
-    console.error("Error saving data:", err);
-  }
-}
-
-// ============== API Routes ==============
-
-// Регистрация
-app.post("/register", (req, res) => {
+// Register
+app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
-
+  
   if (!username || !password) {
-    return res.json({ error: "Username and password required" });
+    return res.status(400).json({ error: 'Username and password required' });
   }
-
-  if (users.find(u => u.username === username)) {
-    return res.json({ error: "Пользователь уже существует" });
+  
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = uuidv4();
+    
+    try {
+      db.prepare('INSERT INTO users (id, username, password) VALUES (?, ?, ?)').run(userId, username, hashedPassword);
+      res.json({ success: true, userId, username });
+    } catch (err) {
+      if (err.message.includes('UNIQUE')) {
+        return res.status(400).json({ error: 'Username already exists' });
+      }
+      throw err;
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const user = {
-    id: uuidv4(),
-    username,
-    password,
-    avatar: "/uploads/default-avatar.png",
-    createdAt: new Date().toISOString(),
-    lastSeen: new Date().toISOString()
-  };
-
-  users.push(user);
-  saveData();
-
-  res.json({ 
-    success: true, 
-    id: user.id,
-    username: user.username,
-    avatar: user.avatar,
-    createdAt: user.createdAt
-  });
 });
 
-// Вход
-app.post("/login", (req, res) => {
+// Login
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-
-  const user = users.find(u => u.username === username && u.password === password);
-
-  if (!user) {
-    return res.json({ error: "Неверный логин или пароль" });
-  }
-
-  user.lastSeen = new Date().toISOString();
-  saveData();
-
-  res.json({
-    success: true,
-    id: user.id,
-    username: user.username,
-    avatar: user.avatar,
-    createdAt: user.createdAt
-  });
-});
-
-// Получить всех пользователей
-app.get("/users", (req, res) => {
-  res.json(
-    users.map(u => ({
-      id: u.id,
-      username: u.username,
-      avatar: u.avatar,
-      online: !!onlineUsers[u.id],
-      lastSeen: u.lastSeen
-    }))
-  );
-});
-
-// Получить информацию о пользователе
-app.get("/user/:userId", (req, res) => {
-  const userId = req.params.userId;
-  const user = users.find(u => u.id === userId);
-
-  if (!user) {
-    return res.status(404).json({ error: "User not found" });
-  }
-
-  res.json({
-    id: user.id,
-    username: user.username,
-    avatar: user.avatar,
-    online: !!onlineUsers[user.id],
-    lastSeen: user.lastSeen,
-    createdAt: user.createdAt
-  });
-});
-
-// ============== ПОИСК ПОЛЬЗОВАТЕЛЕЙ - ИСПРАВЛЕНО ==============
-app.get("/search/users", (req, res) => {
-  const { q } = req.query;
   
-  console.log("🔍 Search request for:", q);
-  console.log("All users:", users.map(u => u.username));
-  
-  if (!q || q.length < 1) {
-    return res.json([]);
-  }
-
-  const searchTerm = q.toLowerCase();
-  
-  const searchResults = users
-    .filter(u => {
-      // Поиск по username (без учета регистра)
-      return u.username.toLowerCase().includes(searchTerm);
-    })
-    .map(u => ({
-      id: u.id,
-      username: u.username,
-      avatar: u.avatar,
-      online: !!onlineUsers[u.id]
-    }))
-    .slice(0, 20);
-
-  console.log("✅ Search results:", searchResults);
-  res.json(searchResults);
-});
-
-// Создать чат
-app.post("/createChat", (req, res) => {
-  const { members } = req.body;
-
-  if (!members || members.length < 2) {
-    return res.json({ error: "Need at least 2 members" });
-  }
-
-  // Проверяем, существует ли уже такой чат
-  let chat = chats.find(c => 
-    c.members && 
-    c.members.includes(members[0]) && 
-    c.members.includes(members[1]) &&
-    c.members.length === 2
-  );
-
-  if (!chat) {
-    chat = {
-      id: uuidv4(),
-      members,
-      messages: [],
-      createdAt: new Date().toISOString(),
-      pinned: false,
-      lastMessage: null
-    };
-    chats.push(chat);
-    saveData();
-  }
-
-  const otherUser = users.find(u => u.id !== members[0] && chat.members.includes(u.id));
-
-  res.json({ 
-    success: true, 
-    chat: {
-      ...chat,
-      otherUser: otherUser ? {
-        id: otherUser.id,
-        username: otherUser.username,
-        avatar: otherUser.avatar,
-        online: !!onlineUsers[otherUser.id]
-      } : null
-    }
-  });
-});
-
-// Отправить сообщение
-app.post("/sendMessage", upload.single("file"), (req, res) => {
-  const { chatId, userId, text } = req.body;
-
-  const chat = chats.find(c => c.id === chatId);
-  if (!chat) {
-    return res.json({ error: "Чат не найден" });
-  }
-
-  const message = {
-    id: uuidv4(),
-    userId,
-    text: text || "",
-    file: req.file ? "/uploads/" + req.file.filename : null,
-    fileType: req.file ? req.file.mimetype : null,
-    time: new Date().toLocaleTimeString(),
-    timestamp: Date.now(),
-    read: false,
-    readBy: [userId]
-  };
-
-  chat.messages.push(message);
-  chat.lastMessage = message;
-  saveData();
-
-  // Отправляем сообщение всем в комнате чата
-  io.to(chatId).emit("newMessage", { 
-    chatId, 
-    message,
-    userId: userId
-  });
-
-  res.json({ success: true, message });
-});
-
-// Получить данные пользователя
-app.get("/data/:userId", (req, res) => {
-  const userId = req.params.userId;
-  
-  const userChats = chats.filter(c => c.members.includes(userId));
-  
-  const enrichedChats = userChats.map(chat => {
-    const otherUserIds = chat.members.filter(id => id !== userId);
-    const otherUser = users.find(u => u.id === otherUserIds[0]);
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     
-    return {
-      ...chat,
-      otherUser: otherUser ? {
-        id: otherUser.id,
-        username: otherUser.username,
-        avatar: otherUser.avatar,
-        online: !!onlineUsers[otherUser.id]
-      } : null
-    };
-  });
-
-  res.json({ chats: enrichedChats });
-});
-
-// Обновить профиль
-app.post("/updateProfile", (req, res) => {
-  const { userId, username, avatar } = req.body;
-
-  const user = users.find(u => u.id === userId);
-  if (!user) {
-    return res.json({ error: "User not found" });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    
+    res.json({ success: true, token: user.id, user: { id: user.id, username: user.username, avatar: user.avatar } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  if (username) user.username = username;
-  if (avatar) user.avatar = avatar;
-
-  saveData();
-  res.json({ success: true });
 });
 
-// Загрузить аватар
-app.post("/uploadAvatar", upload.single("avatar"), (req, res) => {
-  const { userId } = req.body;
-
+// Upload avatar
+app.post('/api/upload-avatar', upload.single('avatar'), (req, res) => {
   if (!req.file) {
-    return res.json({ error: "No file uploaded" });
+    return res.status(400).json({ error: 'No file uploaded' });
   }
-
-  const user = users.find(u => u.id === userId);
-  if (!user) {
-    return res.json({ error: "User not found" });
+  
+  const userId = req.body.userId;
+  const avatarPath = `/uploads/avatars/${req.file.filename}`;
+  
+  try {
+    db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(avatarPath, userId);
+    res.json({ success: true, avatar: avatarPath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const avatarUrl = "/uploads/avatars/" + req.file.filename;
-  user.avatar = avatarUrl;
-
-  saveData();
-
-  res.json({ success: true, avatarUrl });
 });
 
-// Закрепить чат
-app.post("/pinChat", (req, res) => {
-  const { chatId, userId, pin } = req.body;
-
-  const chat = chats.find(c => c.id === chatId);
-  if (!chat || !chat.members.includes(userId)) {
-    return res.json({ error: "Chat not found or access denied" });
+// Upload file
+app.post('/api/upload-file', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
   }
-
-  chat.pinned = pin;
-  saveData();
-
-  res.json({ success: true, pinned: pin });
-});
-
-// Удалить сообщение
-app.post("/deleteMessage", (req, res) => {
-  const { messageId, chatId, userId } = req.body;
-
-  const chat = chats.find(c => c.id === chatId);
-  if (!chat) {
-    return res.json({ error: "Chat not found" });
-  }
-
-  const messageIndex = chat.messages.findIndex(m => m.id === messageId);
-  if (messageIndex === -1) {
-    return res.json({ error: "Message not found" });
-  }
-
-  const message = chat.messages[messageIndex];
-  if (message.userId !== userId) {
-    return res.json({ error: "Not authorized" });
-  }
-
-  chat.messages[messageIndex] = {
-    ...message,
-    deleted: true,
-    text: "Сообщение удалено",
-    file: null
-  };
-
-  saveData();
-  io.to(chatId).emit("messageDeleted", { chatId, messageId });
-
-  res.json({ success: true });
-});
-
-// Health check
-app.get("/health", (req, res) => {
-  res.status(200).json({ 
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    users: users.length,
-    chats: chats.length,
-    online: Object.keys(onlineUsers).length
-  });
-});
-
-// Статистика
-app.get("/stats", (req, res) => {
-  res.json({
-    totalUsers: users.length,
-    totalChats: chats.length,
-    totalMessages: chats.reduce((acc, chat) => acc + chat.messages.length, 0),
-    onlineUsers: Object.keys(onlineUsers).length
-  });
-});
-
-// ============== Socket.IO ==============
-
-io.on("connection", (socket) => {
-  console.log("New connection:", socket.id);
-
-  socket.on("login", (userId) => {
-    socket.userId = userId;
-    onlineUsers[userId] = true;
-    
-    // Обновляем время последнего посещения
-    const user = users.find(u => u.id === userId);
-    if (user) {
-      user.lastSeen = new Date().toISOString();
-      saveData();
-    }
-    
-    // Присоединяемся к комнатам чатов пользователя
-    const userChats = chats.filter(c => c.members.includes(userId));
-    userChats.forEach(chat => {
-      socket.join(chat.id);
-    });
-
-    io.emit("onlineUpdate", { userId, online: true });
-  });
-
-  socket.on("message read", (data) => {
-    const { chatId, userId } = data;
-    
-    const chat = chats.find(c => c.id === chatId);
-    if (!chat) return;
-
-    let updated = false;
-    chat.messages.forEach(msg => {
-      if (msg.userId !== userId && !msg.read) {
-        msg.read = true;
-        msg.readBy = msg.readBy || [];
-        if (!msg.readBy.includes(userId)) {
-          msg.readBy.push(userId);
-          updated = true;
-        }
-      }
-    });
-
-    if (updated) {
-      saveData();
-      io.to(chatId).emit("messages read", { chatId, userId });
-    }
-  });
-
-  socket.on("typing", (data) => {
-    const { chatId, userId, isTyping } = data;
-    socket.to(chatId).emit("user typing", { userId, isTyping });
-  });
-
-  // Call events
-  socket.on("call-offer", (data) => {
-    console.log("Call offer from", socket.userId, "to", data.targetId);
-    socket.to(data.targetId).emit("call-offer", {
-      ...data,
-      callerId: socket.userId
-    });
-  });
-
-  socket.on("call-answer", (data) => {
-    console.log("Call answer from", socket.userId, "to", data.targetId);
-    socket.to(data.targetId).emit("call-answer", data);
-  });
-
-  socket.on("call-ice-candidate", (data) => {
-    console.log("ICE candidate from", socket.userId, "to", data.targetId);
-    socket.to(data.targetId).emit("call-ice-candidate", data);
-  });
-
-  socket.on("call-reject", (data) => {
-    console.log("Call reject from", socket.userId, "to", data.targetId);
-    socket.to(data.targetId).emit("call-reject");
-  });
-
-  socket.on("call-end", (data) => {
-    console.log("Call end from", socket.userId, "to", data.targetId);
-    socket.to(data.targetId).emit("call-end");
-  });
-
-  socket.on("disconnect", () => {
-    if (socket.userId) {
-      delete onlineUsers[socket.userId];
-      
-      // Обновляем время последнего посещения
-      const user = users.find(u => u.id === socket.userId);
-      if (user) {
-        user.lastSeen = new Date().toISOString();
-        saveData();
-      }
-      
-      io.emit("onlineUpdate", { userId: socket.userId, online: false });
-    }
-    console.log("Disconnected:", socket.id);
-  });
-});
-
-// Создаем дефолтный аватар, если его нет
-const defaultAvatarPath = path.join(__dirname, "uploads", "default-avatar.png");
-if (!fs.existsSync(defaultAvatarPath)) {
-  console.log("Default avatar not found. Please add default-avatar.png to uploads folder.");
-}
-
-// Для SPA - отдаем index.html на все маршруты
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// Обработка ошибок
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
+  
+  const filePath = `/uploads/files/${req.file.filename}`;
+  const fileType = req.file.mimetype;
+  
+  res.json({ success: true, url: filePath, type: fileType });
 });
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📱 Local: http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
-module.exports = app;

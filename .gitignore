@@ -1,4 +1,13 @@
-node_modules/ 
-uploads/ 
-data.json 
-.env 
+```
+# Logs
+*.log
+server.log
+
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*
+```

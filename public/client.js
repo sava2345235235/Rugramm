@@ -307,20 +307,44 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      userSearchResults.innerHTML = filteredUsers.map(user => `
-        <div class="user-search-item" data-user-id="${user.id}" data-username="${user.username}">
-          <img src="${user.avatar || '/uploads/default-avatar.png'}" alt="${user.username}">
-          <div class="user-info">
-            <div class="user-name">${user.username}</div>
-            <div class="user-status">
-              <span class="status-dot ${user.online ? 'online' : 'offline'}"></span>
-              <span style="color: ${user.online ? '#22c55e' : '#9ca3af'};">
-                ${user.online ? 'в сети' : 'не в сети'}
-              </span>
-            </div>
-          </div>
-        </div>
-      `).join('');
+      // Очищаем контейнер и добавляем элементы безопасно
+      userSearchResults.innerHTML = '';
+      
+      filteredUsers.forEach(user => {
+        const itemDiv = document.createElement("div");
+        itemDiv.className = "user-search-item";
+        itemDiv.dataset.userId = user.id;
+        itemDiv.dataset.username = user.username;
+        
+        const img = document.createElement("img");
+        img.src = user.avatar || '/uploads/default-avatar.png';
+        img.alt = user.username;
+        
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "user-info";
+        
+        const nameDiv = document.createElement("div");
+        nameDiv.className = "user-name";
+        nameDiv.textContent = user.username; // Используем textContent для защиты от XSS
+        
+        const statusDiv = document.createElement("div");
+        statusDiv.className = "user-status";
+        
+        const dotSpan = document.createElement("span");
+        dotSpan.className = `status-dot ${user.online ? 'online' : 'offline'}`;
+        
+        const textSpan = document.createElement("span");
+        textSpan.style.color = user.online ? '#22c55e' : '#9ca3af';
+        textSpan.textContent = user.online ? 'в сети' : 'не в сети'; // Используем textContent для защиты от XSS
+        
+        statusDiv.appendChild(dotSpan);
+        statusDiv.appendChild(textSpan);
+        infoDiv.appendChild(nameDiv);
+        infoDiv.appendChild(statusDiv);
+        itemDiv.appendChild(img);
+        itemDiv.appendChild(infoDiv);
+        userSearchResults.appendChild(itemDiv);
+      });
 
       document.querySelectorAll('.user-search-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -642,19 +666,47 @@ document.addEventListener("DOMContentLoaded", () => {
     const time = lastMessage ? formatTime(lastMessage.timestamp) : '';
     const lastMessageText = lastMessage ? (lastMessage.text || '📎 Файл') : 'Нет сообщений';
 
-    div.innerHTML = `
-      <div class="chat-avatar">${otherUser.username.charAt(0)}</div>
-      <div class="chat-info">
-        <div class="chat-name-row">
-          <span class="chat-name">${otherUser.username}</span>
-          <span class="chat-time">${time}</span>
-        </div>
-        <div class="chat-last-message">
-          <span class="last-message-text">${lastMessageText}</span>
-          ${unreadCount > 0 ? `<span class="unread-count">${unreadCount}</span>` : ''}
-        </div>
-      </div>
-    `;
+    // Создаем элементы безопасно с помощью textContent
+    const avatarDiv = document.createElement("div");
+    avatarDiv.className = "chat-avatar";
+    avatarDiv.textContent = otherUser.username.charAt(0);
+    
+    const infoDiv = document.createElement("div");
+    infoDiv.className = "chat-info";
+    
+    const nameRowDiv = document.createElement("div");
+    nameRowDiv.className = "chat-name-row";
+    
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "chat-name";
+    nameSpan.textContent = otherUser.username; // Используем textContent для защиты от XSS
+    
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "chat-time";
+    timeSpan.textContent = time;
+    
+    nameRowDiv.appendChild(nameSpan);
+    nameRowDiv.appendChild(timeSpan);
+    
+    const messageDiv = document.createElement("div");
+    messageDiv.className = "chat-last-message";
+    
+    const messageTextSpan = document.createElement("span");
+    messageTextSpan.className = "last-message-text";
+    messageTextSpan.textContent = lastMessageText; // Используем textContent для защиты от XSS
+    messageDiv.appendChild(messageTextSpan);
+    
+    if (unreadCount > 0) {
+      const unreadSpan = document.createElement("span");
+      unreadSpan.className = "unread-count";
+      unreadSpan.textContent = unreadCount;
+      messageDiv.appendChild(unreadSpan);
+    }
+    
+    infoDiv.appendChild(nameRowDiv);
+    infoDiv.appendChild(messageDiv);
+    div.appendChild(avatarDiv);
+    div.appendChild(infoDiv);
 
     return div;
   }
@@ -717,32 +769,57 @@ document.addEventListener("DOMContentLoaded", () => {
     const messageDiv = document.createElement("div");
     messageDiv.className = `message ${msg.userId === currentUser.id ? 'my-message' : 'their-message'}`;
 
-    let content = '<div class="message-bubble">';
+    const messageBubble = document.createElement("div");
+    messageBubble.className = "message-bubble";
     
     if (msg.userId !== currentUser.id) {
       const sender = users.find(u => u.id === msg.userId);
-      content += `<div class="message-sender">${sender?.username || 'Пользователь'}</div>`;
+      const senderDiv = document.createElement("div");
+      senderDiv.className = "message-sender";
+      senderDiv.textContent = sender?.username || 'Пользователь';
+      messageBubble.appendChild(senderDiv);
     }
 
     if (msg.text) {
-      content += `<div>${msg.text}</div>`;
+      const textDiv = document.createElement("div");
+      textDiv.textContent = msg.text; // Используем textContent для защиты от XSS
+      messageBubble.appendChild(textDiv);
     }
 
     if (msg.file) {
+      const fileDiv = document.createElement("div");
+      fileDiv.className = "message-file";
       const isImage = msg.file.match(/\.(jpg|jpeg|png|gif|webp)$/i);
       if (isImage) {
-        content += `<div class="message-file"><img src="${msg.file}" alt="image" style="max-width: 100%; max-height: 200px; border-radius: 10px;"></div>`;
+        const img = document.createElement("img");
+        img.src = msg.file;
+        img.alt = "image";
+        img.style.cssText = "max-width: 100%; max-height: 200px; border-radius: 10px;";
+        fileDiv.appendChild(img);
       } else {
-        const fileName = msg.file.split('_').pop() || 'файл';
-        content += `<div class="message-file"><a href="${msg.file}" target="_blank">📎 ${fileName}</a></div>`;
+        const fileName = msg.file.split('/').pop() || 'файл';
+        const link = document.createElement("a");
+        link.href = msg.file;
+        link.target = "_blank";
+        link.textContent = "📎 " + fileName;
+        fileDiv.appendChild(link);
       }
+      messageBubble.appendChild(fileDiv);
     }
 
+    const timeDiv = document.createElement("div");
+    timeDiv.className = "message-time";
     const readStatus = msg.read ? '✓✓' : '✓';
-    content += `<div class="message-time">${msg.time} <span class="message-status">${msg.userId === currentUser.id ? readStatus : ''}</span></div>`;
-    content += '</div>';
+    timeDiv.textContent = `${msg.time} `;
+    if (msg.userId === currentUser.id) {
+      const statusSpan = document.createElement("span");
+      statusSpan.className = "message-status";
+      statusSpan.textContent = readStatus;
+      timeDiv.appendChild(statusSpan);
+    }
+    messageBubble.appendChild(timeDiv);
 
-    messageDiv.innerHTML = content;
+    messageDiv.appendChild(messageBubble);
     messageDiv.dataset.id = msg.id;
     messagesDiv.appendChild(messageDiv);
   }

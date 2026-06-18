@@ -3,13 +3,16 @@ const fs = require("fs");
 const multer = require("multer");
 const { v4: uuidv4 } = require("uuid");
 const path = require("path");
+const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 const http = require("http").createServer(app);
 const io = require("socket.io")(http, {
   cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -17,6 +20,23 @@ const io = require("socket.io")(http, {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// Rate limiting для защиты от брутфорса
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 минут
+  max: 10, // максимум 10 запросов
+  message: { error: "Слишком много попыток входа. Попробуйте позже." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 час
+  max: 5, // максимум 5 регистраций
+  message: { error: "Слишком много попыток регистрации. Попробуйте позже." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Создаем папки, если их нет
 if (!fs.existsSync("uploads")) {
@@ -28,6 +48,7 @@ if (!fs.existsSync("uploads/avatars")) {
 }
 
 // Настройка multer для загрузки файлов
+const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === "avatar") {
@@ -37,7 +58,9 @@ const storage = multer.diskStorage({
     }
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + "_" + file.originalname);
+    // Генерируем безопасное имя файла с UUID
+    const ext = path.extname(file.originalname);
+    cb(null, uuidv4() + ext);
   }
 });
 
@@ -45,6 +68,17 @@ const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Разрешаем только изображения для аватарок
+    if (file.fieldname === "avatar" && !allowedMimeTypes.includes(file.mimetype)) {
+      return cb(new Error("Разрешены только изображения (JPEG, PNG, GIF, WebP)"));
+    }
+    // Для обычных файлов разрешаем только изображения
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return cb(new Error("Разрешены только файлы изображений"));
+    }
+    cb(null, true);
   }
 });
 
@@ -75,7 +109,7 @@ function saveData() {
 // ============== API Routes ==============
 
 // Регистрация
-app.post("/register", (req, res) => {
+app.post("/register", registerLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -86,10 +120,14 @@ app.post("/register", (req, res) => {
     return res.json({ error: "Пользователь уже существует" });
   }
 
+  // Хешируем пароль перед сохранением
+  const saltRounds = 10;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
   const user = {
     id: uuidv4(),
     username,
-    password,
+    passwordHash: hashedPassword, // Сохраняем хеш вместо пароля
     avatar: "/uploads/default-avatar.png",
     createdAt: new Date().toISOString(),
     lastSeen: new Date().toISOString()
@@ -108,12 +146,18 @@ app.post("/register", (req, res) => {
 });
 
 // Вход
-app.post("/login", (req, res) => {
+app.post("/login", loginLimiter, async (req, res) => {
   const { username, password } = req.body;
 
-  const user = users.find(u => u.username === username && u.password === password);
+  const user = users.find(u => u.username === username);
 
   if (!user) {
+    return res.json({ error: "Неверный логин или пароль" });
+  }
+
+  // Проверяем хеш пароля
+  const validPassword = await bcrypt.compare(password, user.passwordHash || user.password);
+  if (!validPassword) {
     return res.json({ error: "Неверный логин или пароль" });
   }
 
@@ -295,28 +339,45 @@ app.get("/data/:userId", (req, res) => {
   res.json({ chats: enrichedChats });
 });
 
-// Обновить профиль
+// Обновить профиль - с проверкой авторизации
 app.post("/updateProfile", (req, res) => {
   const { userId, username, avatar } = req.body;
+
+  // Проверка: пользователь может изменять только свой профиль
+  if (!userId) {
+    return res.json({ error: "User ID required" });
+  }
 
   const user = users.find(u => u.id === userId);
   if (!user) {
     return res.json({ error: "User not found" });
   }
 
-  if (username) user.username = username;
+  if (username) {
+    // Проверяем, не занято ли имя другим пользователем
+    const existingUser = users.find(u => u.username === username && u.id !== userId);
+    if (existingUser) {
+      return res.json({ error: "Это имя уже занято" });
+    }
+    user.username = username;
+  }
   if (avatar) user.avatar = avatar;
 
   saveData();
   res.json({ success: true });
 });
 
-// Загрузить аватар
+// Загрузить аватар - с проверкой авторизации
 app.post("/uploadAvatar", upload.single("avatar"), (req, res) => {
   const { userId } = req.body;
 
   if (!req.file) {
     return res.json({ error: "No file uploaded" });
+  }
+
+  // Проверка: пользователь может загружать аватар только для себя
+  if (!userId) {
+    return res.json({ error: "User ID required" });
   }
 
   const user = users.find(u => u.id === userId);

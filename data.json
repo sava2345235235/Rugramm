@@ -1,0 +1,13 @@
+{
+  "users": [
+    {
+      "id": "fea3648b-6a57-4fbc-9651-57b2050cfc70",
+      "username": "testuser",
+      "passwordHash": "$2b$10$rDXaVrEzubsXG.HsHxXX6uY.j85paf/vO3IWoCzND0vFDL/mUZ.Vq",
+      "avatar": "/uploads/default-avatar.png",
+      "createdAt": "2026-04-17T11:14:39.548Z",
+      "lastSeen": "2026-04-17T11:14:52.769Z"
+    }
+  ],
+  "chats": []
+}
